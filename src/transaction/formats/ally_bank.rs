@@ -1,7 +1,7 @@
 use ::transaction::{Transaction, TransactionStatus, TransactionType};
 
 // Column titles in Ally exports are prefixed with a space
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AllyTransaction {
     #[serde(rename = "Date")]
     date: String,
@@ -15,7 +15,7 @@ pub struct AllyTransaction {
     description: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum AllyTransactionType {
     Withdrawal,
     Deposit,

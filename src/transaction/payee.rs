@@ -1,5 +1,5 @@
 #[derive(Debug, Eq, PartialEq)]
-pub enum PayeeType {
-    RawName(String),
-    ResolvedName(String),
+pub enum PayeeNameType {
+    Raw,
+    Resolved,
 }
