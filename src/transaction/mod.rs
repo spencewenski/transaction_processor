@@ -2,7 +2,6 @@ use chrono::prelude::*;
 
 pub mod payee;
 pub mod formats;
-pub mod parser;
 
 #[derive(Debug)]
 pub struct Transaction {
@@ -29,14 +28,14 @@ enum TransactionStatus {
 }
 
 impl Transaction {
-    fn build_transaction(date: String,
-                         date_format: &str,
-                         payee: String,
-                         category: Option<String>,
-                         transaction_type: TransactionType,
-                         amount: String,
-                         status: TransactionStatus,
-                         memo: Option<String>) -> Transaction {
+    fn build(date: String,
+             date_format: &str,
+             payee: String,
+             category: Option<String>,
+             transaction_type: TransactionType,
+             amount: String,
+             status: TransactionStatus,
+             memo: Option<String>) -> Transaction {
         Transaction {
             date: Utc.datetime_from_str(&date, date_format).unwrap(),
             payee,
@@ -65,18 +64,17 @@ impl Transaction {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{Transaction, TransactionType, TransactionStatus};
-    use super::formats::ally_bank::{AllyTransaction, AllyTransactionType};
+    use super::formats::input::ally_bank::{AllyTransaction, AllyTransactionType};
     use super::payee::{PayeeNameType};
     use chrono::prelude::*;
-    use super::parser;
+    use ::parser;
 
     #[test]
     fn test_ally_transaction() {
-        let ally = AllyTransaction::build_transaction(
+        let ally = AllyTransaction::build(
             String::from("2018-06-01"),
             String::from("01:01:54"),
             String::from("-4874"),

@@ -1,6 +1,9 @@
 use ::transaction::{Transaction, TransactionStatus, TransactionType};
+use super::TransactionExporter;
+use std::io;
+use ::parser;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct GoogleSheetsTransaction {
     #[serde(rename = "Date")]
     date: String,
@@ -18,20 +21,20 @@ pub struct GoogleSheetsTransaction {
     memo: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 enum GoogleSheetsTransactionStatus {
     Pending,
     Cleared,
 }
 
 impl GoogleSheetsTransaction {
-    fn build_transaction(date: String,
-                         payee: String,
-                         category: Option<String>,
-                         debit: Option<String>,
-                         credit: Option<String>,
-                         status: GoogleSheetsTransactionStatus,
-                         memo: Option<String>) -> GoogleSheetsTransaction {
+    fn build(date: String,
+             payee: String,
+             category: Option<String>,
+             debit: Option<String>,
+             credit: Option<String>,
+             status: GoogleSheetsTransactionStatus,
+             memo: Option<String>) -> GoogleSheetsTransaction {
         GoogleSheetsTransaction {
             date,
             payee,
@@ -42,7 +45,16 @@ impl GoogleSheetsTransaction {
             memo,
         }
     }
+}
 
+pub struct GoogleSheetsTransactionExporter;
+impl TransactionExporter for GoogleSheetsTransactionExporter {
+    fn export(w: Box<io::Write>, transactions: Vec<Transaction>) {
+        let transactions: Vec<GoogleSheetsTransaction> = transactions.into_iter().map(|t| {
+            Transaction::into(t)
+        }).collect();
+        parser::write_csv_to_writer(transactions, true, w);
+    }
 }
 
 impl From<Transaction> for GoogleSheetsTransaction {
@@ -54,7 +66,7 @@ impl From<Transaction> for GoogleSheetsTransaction {
             TransactionType::Credit => credit = Option::Some(transaction.amount),
         }
 
-        GoogleSheetsTransaction::build_transaction(
+        GoogleSheetsTransaction::build(
             format!("{}", transaction.date.format("%m/%d/%Y")),
             transaction.payee,
             transaction.category,

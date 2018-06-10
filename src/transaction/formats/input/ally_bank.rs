@@ -1,6 +1,9 @@
 use ::transaction::{Transaction, TransactionStatus, TransactionType};
+use super::TransactionImporter;
+use std::io;
+use ::parser;
 
-// Column titles in Ally exports are prefixed with a space
+// Column titles input Ally exports are prefixed with a space
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AllyTransaction {
     #[serde(rename = "Date")]
@@ -22,11 +25,11 @@ pub enum AllyTransactionType {
 }
 
 impl AllyTransaction {
-    pub fn build_transaction(date: String,
-                             time: String,
-                             amount: String,
-                             transaction_type: AllyTransactionType,
-                             description: String) -> AllyTransaction {
+    pub fn build(date: String,
+                 time: String,
+                 amount: String,
+                 transaction_type: AllyTransactionType,
+                 description: String) -> AllyTransaction {
         AllyTransaction {
             date,
             time,
@@ -37,17 +40,27 @@ impl AllyTransaction {
     }
 }
 
+pub struct AllyTransactionImporter;
+impl TransactionImporter for AllyTransactionImporter {
+    fn import(r: Box<io::Read>) -> Vec<Transaction> {
+        let transactions : Vec<AllyTransaction> = parser::parse_csv_from_reader(r);
+        transactions.into_iter().map(|t| {
+            Transaction::from(t)
+        }).collect()
+    }
+}
+
 impl From<AllyTransaction> for Transaction {
     fn from(ally: AllyTransaction) -> Self {
         let date_string = ally.date + " " + &ally.time;
-        Transaction::build_transaction(date_string,
-                                       "%Y-%m-%d %T",
-                                       ally.description,
-                                       Option::None,
-                                       TransactionType::from(ally.transaction_type),
-                                       ally.amount.trim().trim_left_matches('-').to_string(),
-                                       TransactionStatus::Cleared,
-                                       Option::None)
+        Transaction::build(date_string,
+                           "%Y-%m-%d %T",
+                           ally.description,
+                           Option::None,
+                           TransactionType::from(ally.transaction_type),
+                           ally.amount.trim().trim_left_matches('-').to_string(),
+                           TransactionStatus::Cleared,
+                           Option::None)
     }
 }
 

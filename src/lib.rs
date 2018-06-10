@@ -7,3 +7,4 @@ extern crate argparse;
 
 pub mod transaction;
 pub mod arguments;
+pub mod parser;
