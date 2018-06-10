@@ -18,9 +18,11 @@ fn main() {
     let mut importers: HashMap<String, Box<Fn(Box<io::Read>) -> Vec<Transaction>>> = HashMap::new();
     importers.insert(String::from("ally"), AllyTransactionImporter::new());
     importers.insert(String::from("citi"), CitiTransactionImporter::new());
+    let importers = importers;
 
     let mut exporters: HashMap<String, Box<Fn(Box<io::Write>, Vec<Transaction>)>> = HashMap::new();
     exporters.insert(String::from("google"), GoogleSheetsTransactionExporter::new());
+    let exporters = exporters;
 
     let importer = importers.get(&args.src_format).unwrap();
     let r: Box<io::Read> = match args.src_file {
