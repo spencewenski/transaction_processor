@@ -38,13 +38,13 @@ impl Transaction {
              memo: Option<String>) -> Transaction {
         Transaction {
             date: Utc.datetime_from_str(&date, date_format).unwrap(),
-            payee: clean_string(payee),
+            payee: InputCleaner::clean(payee),
             payee_name_type: payee::PayeeNameType::Raw,
-            category: clean_option_string(category),
+            category: InputCleaner::clean(category),
             transaction_type,
-            amount: clean_string(amount),
+            amount: InputCleaner::clean(amount),
             status,
-            memo: clean_option_string(memo),
+            memo: InputCleaner::clean(memo),
         }
     }
 
@@ -64,14 +64,24 @@ impl Transaction {
     }
 }
 
-fn clean_string(s: String) -> String {
-    s.trim().replace("\n", " ")
+
+struct InputCleaner;
+trait Clean<T> {
+    fn clean(s: T) -> T;
 }
 
-fn clean_option_string(s: Option<String>) -> Option<String> {
-    match s {
-        Option::Some(s) => Option::Some(clean_string(s)),
-        _ => Option::None,
+impl Clean<String> for InputCleaner {
+    fn clean(s: String) -> String {
+        s.trim().replace("\n", " ")
+    }
+}
+
+impl Clean<Option<String>> for InputCleaner {
+    fn clean(s: Option<String>) -> Option<String> {
+        match s {
+            Option::Some(s) => Option::Some(Self::clean(s)),
+            _ => Option::None,
+        }
     }
 }
 
