@@ -4,7 +4,7 @@ use std::io;
 use ::parser;
 
 // Column titles input Ally exports are prefixed with a space
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AllyTransaction {
     #[serde(rename = "Date")]
     date: String,

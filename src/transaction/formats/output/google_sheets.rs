@@ -13,7 +13,7 @@ pub struct GoogleSheetsTransaction {
     category: Option<String>,
     #[serde(rename = "Debit")]
     debit: Option<String>,
-    #[serde(rename = "Debit")]
+    #[serde(rename = "Credit")]
     credit: Option<String>,
     #[serde(rename = "Status")]
     status: GoogleSheetsTransactionStatus,

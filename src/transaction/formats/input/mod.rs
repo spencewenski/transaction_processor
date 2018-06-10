@@ -1,4 +1,5 @@
 pub mod ally_bank;
+pub mod citi;
 
 use super::super::Transaction;
 use std::io;

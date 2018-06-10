@@ -38,13 +38,13 @@ impl Transaction {
              memo: Option<String>) -> Transaction {
         Transaction {
             date: Utc.datetime_from_str(&date, date_format).unwrap(),
-            payee,
+            payee: clean_string(payee),
             payee_name_type: payee::PayeeNameType::Raw,
-            category,
+            category: clean_option_string(category),
             transaction_type,
-            amount,
+            amount: clean_string(amount),
             status,
-            memo
+            memo: clean_option_string(memo),
         }
     }
 
@@ -64,10 +64,22 @@ impl Transaction {
     }
 }
 
+fn clean_string(s: String) -> String {
+    s.trim().replace("\n", " ")
+}
+
+fn clean_option_string(s: Option<String>) -> Option<String> {
+    match s {
+        Option::Some(s) => Option::Some(clean_string(s)),
+        _ => Option::None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Transaction, TransactionType, TransactionStatus};
     use super::formats::input::ally_bank::{AllyTransaction, AllyTransactionType};
+    use super::formats::input::citi::{CitiTransaction, CitiTransactionStatus};
     use super::payee::{PayeeNameType};
     use chrono::prelude::*;
     use ::parser;
@@ -75,21 +87,44 @@ mod tests {
     #[test]
     fn test_ally_transaction() {
         let ally = AllyTransaction::build(
-            String::from("2018-06-01"),
-            String::from("01:01:54"),
-            String::from("-4874"),
+            String::from("2018-01-01"),
+            String::from("01:02:34"),
+            String::from("-1234"),
             AllyTransactionType::Withdrawal,
-            String::from("Internet transfer to Online Savings account XXXXXX5489"));
+            String::from("Description"));
 
         let transaction = Transaction::from(ally);
-        assert_eq!(String::from("4874"), transaction.amount);
-        assert_eq!(Utc.datetime_from_str("2018-06-01 01:01:54", "%Y-%m-%d %T").unwrap().timestamp(), transaction.date.timestamp());
+        assert_eq!(String::from("1234"), transaction.amount);
+        assert_eq!(Utc.datetime_from_str("2018-01-01 01:02:34", "%Y-%m-%d %T").unwrap().timestamp(), transaction.date.timestamp());
         assert_eq!(TransactionType::Debit, transaction.transaction_type);
         assert_eq!(TransactionStatus::Cleared, transaction.status);
 
-        let transaction = transaction.clean_payee(String::from("Ally Savings"));
+        let transaction = transaction.clean_payee(String::from("Payee A"));
         assert_eq!(PayeeNameType::Resolved, transaction.payee_name_type);
-        assert_eq!(String::from("Ally Savings"), transaction.payee);
+        assert_eq!(String::from("Payee A"), transaction.payee);
+
+        let transaction = transaction.update_category(String::from("Category A"));
+        assert_eq!(Option::Some(String::from("Category A")), transaction.category);
+    }
+
+    #[test]
+    fn test_citi_transaction() {
+        let citi = CitiTransaction::build(
+            CitiTransactionStatus::Pending,
+            String::from("06/01/2018"),
+            String::from("Description"),
+            Option::Some(String::from("1234")),
+            Option::None);
+
+        let transaction = Transaction::from(citi);
+        assert_eq!(String::from("1234"), transaction.amount);
+        assert_eq!(Utc.datetime_from_str("06/01/2018 00:00:00", "%m/%d/%Y %T").unwrap().timestamp(), transaction.date.timestamp());
+        assert_eq!(TransactionType::Debit, transaction.transaction_type);
+        assert_eq!(TransactionStatus::Pending, transaction.status);
+
+        let transaction = transaction.clean_payee(String::from("Payee A"));
+        assert_eq!(PayeeNameType::Resolved, transaction.payee_name_type);
+        assert_eq!(String::from("Payee A"), transaction.payee);
 
         let transaction = transaction.update_category(String::from("Category A"));
         assert_eq!(Option::Some(String::from("Category A")), transaction.category);

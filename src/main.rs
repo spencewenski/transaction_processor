@@ -3,6 +3,7 @@ extern crate argparse;
 
 use transaction_processor::transaction::{Transaction};
 use transaction_processor::transaction::formats::input::ally_bank::{AllyTransactionImporter};
+use transaction_processor::transaction::formats::input::citi::{CitiTransactionImporter};
 use transaction_processor::transaction::formats::input::{TransactionImporter};
 use transaction_processor::transaction::formats::output::google_sheets::{GoogleSheetsTransactionExporter};
 use transaction_processor::transaction::formats::output::{TransactionExporter};
@@ -16,6 +17,7 @@ fn main() {
 
     let mut importers: HashMap<String, Box<Fn(Box<io::Read>) -> Vec<Transaction>>> = HashMap::new();
     importers.insert(String::from("ally"), AllyTransactionImporter::new());
+    importers.insert(String::from("citi"), CitiTransactionImporter::new());
 
     let mut exporters: HashMap<String, Box<Fn(Box<io::Write>, Vec<Transaction>)>> = HashMap::new();
     exporters.insert(String::from("google"), GoogleSheetsTransactionExporter::new());
