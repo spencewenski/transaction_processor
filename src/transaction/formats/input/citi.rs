@@ -57,7 +57,7 @@ impl From<CitiTransaction> for Transaction {
                            citi.description,
                            Option::None,
                            type_and_amount.0,
-                           type_and_amount.1.unwrap(),
+                           type_and_amount.1.unwrap_or(String::from("0")),
                            TransactionStatus::from(citi.status),
                            Option::None)
     }
@@ -73,14 +73,12 @@ impl From<CitiTransactionStatus> for TransactionStatus {
 }
 
 fn get_transaction_type_and_amount(debit: Option<String>, credit: Option<String>) -> (TransactionType, Option<String>) {
-    match debit {
-        Option::Some(d) => (TransactionType::Debit, Option::Some(d)),
-        _ => {
-            match credit {
-                Option::Some(c) => (TransactionType::Credit, Option::Some(c)),
-                _ => (TransactionType::Credit, Option::Some(String::from("0")))
-            }
-        }
+    if let Option::Some(d) = debit {
+        return (TransactionType::Debit, Option::Some(d))
     }
+    if let Option::Some(c) = credit {
+        return (TransactionType::Credit, Option::Some(c))
+    }
+    (TransactionType::Credit, Option::None)
 }
 
