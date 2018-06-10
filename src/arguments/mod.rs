@@ -1,4 +1,5 @@
 use argparse::{ArgumentParser, Store};
+use itertools::Itertools;
 
 #[derive(Debug, Default)]
 pub struct Arguments {
@@ -35,21 +36,26 @@ struct Args {
     dst_file: String,
 }
 
-pub fn parse_args() -> Arguments {
+pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Arguments {
     let mut args : Args = Default::default();
+    let src_options = format!("Source format. One of [{}]", src_formats.iter().join(", "));
+    let dst_options = format!("Destination format. One of [{}]", dst_formats.iter().join(", "));
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Transaction processor");
+
         ap.refer(&mut args.src_format)
             .add_option(&["-s", "--src-format"],
                         Store,
-                        "Source format")
+                        &src_options)
             .required();
+
         ap.refer(&mut args.dst_format)
             .add_option(&["-d", "--dst-format"],
                         Store,
-                        "Destination format")
+                        &dst_options)
             .required();
+
         ap.refer(&mut args.src_file)
             .add_option(&["-i", "--src-file"],
                         Store,

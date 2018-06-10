@@ -4,6 +4,7 @@ extern crate csv;
 extern crate serde_derive;
 extern crate serde;
 extern crate argparse;
+extern crate itertools;
 
 pub mod transaction;
 pub mod arguments;

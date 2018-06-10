@@ -2,6 +2,7 @@ use chrono::prelude::*;
 
 pub mod payee;
 pub mod formats;
+pub mod transaction_io;
 
 #[derive(Debug)]
 pub struct Transaction {
