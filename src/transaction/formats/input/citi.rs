@@ -1,7 +1,9 @@
-use ::transaction::{Transaction, TransactionStatus, TransactionType};
+use transaction::{Transaction, TransactionStatus, TransactionType};
 use super::TransactionImporter;
 use std::io;
-use ::parser;
+use parser;
+use fantoccini::Client;
+use tokio_core;
 
 #[derive(Debug, Deserialize)]
 pub struct CitiTransaction {
@@ -40,12 +42,23 @@ impl CitiTransaction {
 }
 
 pub struct CitiTransactionImporter;
+impl CitiTransactionImporter {
+    pub fn new() -> CitiTransactionImporter { CitiTransactionImporter{} }
+}
+
 impl TransactionImporter for CitiTransactionImporter {
-    fn import(r: Box<io::Read>) -> Vec<Transaction> {
+    fn import(&self, r: Box<io::Read>) -> Vec<Transaction> {
         let transactions : Vec<CitiTransaction> = parser::parse_csv_from_reader(r);
         transactions.into_iter().map(|t| {
             Transaction::from(t)
         }).collect()
+    }
+
+    fn download(&self,
+                core: &mut tokio_core::reactor::Core,
+                client: &Client,
+                account: &Option<String>) {
+        unimplemented!()
     }
 }
 
