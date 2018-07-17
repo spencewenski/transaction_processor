@@ -1,7 +1,7 @@
-use ::transaction::{Transaction, TransactionStatus, TransactionType};
+use transaction::{Transaction, TransactionStatus, TransactionType};
 use super::TransactionExporter;
 use std::io;
-use ::parser;
+use parser;
 
 #[derive(Debug, Serialize)]
 pub struct GoogleSheetsTransaction {
@@ -48,8 +48,12 @@ impl GoogleSheetsTransaction {
 }
 
 pub struct GoogleSheetsTransactionExporter;
+impl GoogleSheetsTransactionExporter {
+    pub fn new() -> GoogleSheetsTransactionExporter { GoogleSheetsTransactionExporter{} }
+}
+
 impl TransactionExporter for GoogleSheetsTransactionExporter {
-    fn export(w: Box<io::Write>, transactions: Vec<Transaction>) {
+    fn export(&self, w: Box<io::Write>, transactions: Vec<Transaction>) {
         let transactions: Vec<GoogleSheetsTransaction> = transactions.into_iter().map(|t| {
             Transaction::into(t)
         }).collect();
