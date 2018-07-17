@@ -1,0 +1,18 @@
+# Short description here
+
+
+# Gitlab issue. Example:
+#   Issue #1234: Something is broken
+Issue #:
+
+[Problem]
+# Description of the problem.
+
+
+[Solution]
+# Description of the solution.
+
+
+# Uncomment the following line to skip CI for this commit. This should only be
+# done if no code or assets were modified in this commit.
+# [skip ci]
