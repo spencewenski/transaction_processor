@@ -10,6 +10,7 @@ pub struct Arguments {
     pub dst_format: String,
     pub src_file: Option<String>,
     pub dst_file: Option<String>,
+    pub sort: Option<Sort>,
 }
 
 #[derive(Debug)]
@@ -50,7 +51,93 @@ impl From<Args> for Arguments {
                 Option::Some(a.dst_file)
             } else {
                 Option::None
-            }
+            },
+            sort: get_sort(a.sort_by, a.sort_order),
+        }
+    }
+}
+
+fn get_sort(sort_by: String, sort_order: String) -> Option<Sort> {
+    if let Err(e) = SortBy::from_str(&sort_by) {
+        return Option::None;
+    }
+    let mut builder = SortBuilder::new();
+    if let Ok(x) = SortBy::from_str(&sort_by) {
+        builder.sort_by(x);
+    }
+    if let Ok(x) = SortOrder::from_str(&sort_order) {
+        builder.order(x);
+    }
+    Option::Some(builder.build())
+}
+
+#[derive(Debug)]
+pub struct Sort {
+    pub sort_by: SortBy,
+    pub order: SortOrder,
+}
+
+struct SortBuilder {
+    sort_by: SortBy,
+    order: SortOrder,
+}
+
+impl SortBuilder {
+    fn new() -> SortBuilder {
+        SortBuilder {
+            sort_by: SortBy::Date,
+            order: SortOrder::Ascending,
+        }
+    }
+
+    fn build(self) -> Sort {
+        Sort {
+            sort_by: self.sort_by,
+            order: self.order,
+        }
+    }
+
+    fn sort_by(&mut self, sort_by: SortBy) -> &mut SortBuilder {
+        self.sort_by = sort_by;
+        self
+    }
+
+    fn order(&mut self, order: SortOrder) -> &mut SortBuilder {
+        self.order = order;
+        self
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SortBy {
+    Date,
+}
+
+impl FromStr for SortBy {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        match s {
+            "date" => Ok(SortBy::Date),
+            _ => Err(())
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SortOrder {
+    Ascending,
+    Descending,
+}
+
+impl FromStr for SortOrder {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        match s {
+            "ascending" => Ok(SortOrder::Ascending),
+            "descending" => Ok(SortOrder::Descending),
+            _ => Err(())
         }
     }
 }
@@ -62,6 +149,8 @@ struct Args {
     dst_format: String,
     src_file: String,
     dst_file: String,
+    sort_by: String,
+    sort_order: String,
 }
 
 impl Args {
@@ -73,6 +162,8 @@ impl Args {
             dst_format: Default::default(),
             src_file: Default::default(),
             dst_file: Default::default(),
+            sort_by: Default::default(),
+            sort_order: Default::default(),
         }
     }
 }
@@ -118,6 +209,17 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["-o", "--dst-file"],
                         Store,
                         "Destination file");
+
+        ap.refer(&mut args.sort_by)
+            .add_option(&["--sort-by"],
+                        Store,
+                        "What to sort the output by");
+
+        ap.refer(&mut args.sort_order)
+            .add_option(&["--sort-order"],
+                        Store,
+                        "Order in which to sort the output");
+
         ap.parse_args_or_exit();
     }
     Arguments::from(args)

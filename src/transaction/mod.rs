@@ -63,6 +63,10 @@ impl Transaction {
             ..self
         }
     }
+
+    pub fn date(&self) -> &DateTime<Utc> {
+        &self.date
+    }
 }
 
 

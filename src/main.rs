@@ -10,7 +10,7 @@ fn main() {
     let args = parse_args(transaction_io.list_importers(),
                                      transaction_io.list_exporters());
 
-    let transactions = {
+    let mut transactions = {
         if let SourceType::Website = args.src_type {
             let config = WebDriverConfig::build(AutoDownload::True(MimeType::TextCsv),
                                                 false, "http://localhost:4444");
@@ -26,5 +26,15 @@ fn main() {
             transaction_io.import(&args)
         }
     };
+    if let Option::Some(ref sort) = &args.sort {
+        transactions.sort_by(|a, b| {
+            if SortOrder::Ascending == sort.order {
+                a.date().cmp(&b.date())
+            } else {
+                a.date().cmp(&b.date()).reverse()
+            }
+        });
+    }
+    let transactions = transactions;
     transaction_io.export(&args, transactions);
 }
