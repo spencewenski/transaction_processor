@@ -64,22 +64,25 @@ impl TransactionImporter for AllyTransactionImporter {
                 account: &Option<String>) {
         let client = client;
 
-        // now let's set up the sequence of steps we want the browser to take
-        // first, go to the Wikipedia page for Foobar
-        // login
-        let f = client.goto("https://www.ally.com/")
-            .and_then( |c| {
-                println!("Finding account type element");
-                c.find(Locator::Id("account"))
-            })
-            .and_then(|x| {
-                println!("Selecting account type");
-                x.select_by_value("aob")
-            });
-
+        println!("Navigating to website.");
+        let f = client.goto("https://www.ally.com/");
         core.run(f).unwrap();
 
-        println!("Finding login form");
+        println!("Opening login form.");
+        let f = client.wait_for_find(Locator::Id("login-btn"))
+            .and_then(|e| {
+                e.click()
+            });
+        core.run(f).unwrap();
+
+        println!("Select account type.");
+        let f = client.wait_for_find(Locator::Id("account"))
+            .and_then(|e| {
+                e.select_by_value("aob")
+            });
+        core.run(f).unwrap();
+
+        println!("Filling login form.");
         let f = client.form(Locator::Css("form[data-id=\"storefront-login\"]"))
             .and_then(|f| {
                 println!("Filling in username");
@@ -94,7 +97,6 @@ impl TransactionImporter for AllyTransactionImporter {
                 println!("Submitting form");
                 f.submit()
             });
-
         core.run(f).unwrap();
 
         // Open download button for first account
@@ -103,7 +105,6 @@ impl TransactionImporter for AllyTransactionImporter {
                 println!("Clicking accounts menu");
                 e.click()
             });
-
         core.run(f).unwrap();
 
         println!("Finding account list items (?)");
@@ -154,7 +155,6 @@ impl TransactionImporter for AllyTransactionImporter {
         core.run(f).unwrap();
 
         // Download CSV for account
-
         let f = client.wait_for_find(Locator::Id("select-file-format"))
             .and_then(|e| {
                 println!("Selecting CSV file format");
