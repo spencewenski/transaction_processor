@@ -1,4 +1,4 @@
-use argparse::{ArgumentParser, Store};
+use argparse::{ArgumentParser, Store, StoreTrue, StoreFalse};
 use itertools::Itertools;
 use std::str::FromStr;
 
@@ -11,6 +11,7 @@ pub struct Arguments {
     pub src_file: Option<String>,
     pub dst_file: Option<String>,
     pub sort: Option<Sort>,
+    pub include_header: bool,
 }
 
 #[derive(Debug)]
@@ -53,6 +54,7 @@ impl From<Args> for Arguments {
                 Option::None
             },
             sort: get_sort(a.sort_by, a.sort_order),
+            include_header: a.include_header,
         }
     }
 }
@@ -151,6 +153,7 @@ struct Args {
     dst_file: String,
     sort_by: String,
     sort_order: String,
+    include_header: bool,
 }
 
 impl Args {
@@ -164,6 +167,7 @@ impl Args {
             dst_file: Default::default(),
             sort_by: Default::default(),
             sort_order: Default::default(),
+            include_header: true,
         }
     }
 }
@@ -219,6 +223,14 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["--sort-order"],
                         Store,
                         "Order in which to sort the output");
+
+        ap.refer(&mut args.include_header)
+            .add_option(&["--include-header"],
+                        StoreTrue,
+                        "Include header in the csv output.")
+            .add_option(&["--exclude-header"],
+                        StoreFalse,
+                        "Exclude header in the csv output.");
 
         ap.parse_args_or_exit();
     }
