@@ -105,6 +105,6 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdout())
         };
-        exporter.export(w, transactions);
+        exporter.export(w, transactions, args.include_header);
     }
 }

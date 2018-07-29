@@ -53,11 +53,11 @@ impl GoogleSheetsTransactionExporter {
 }
 
 impl TransactionExporter for GoogleSheetsTransactionExporter {
-    fn export(&self, w: Box<io::Write>, transactions: Vec<Transaction>) {
+    fn export(&self, w: Box<io::Write>, transactions: Vec<Transaction>, include_header: bool) {
         let transactions: Vec<GoogleSheetsTransaction> = transactions.into_iter().map(|t| {
             Transaction::into(t)
         }).collect();
-        parser::write_csv_to_writer(transactions, true, w);
+        parser::write_csv_to_writer(transactions, include_header, w);
     }
 }
 
