@@ -67,7 +67,10 @@ pages:
     paths:
       - public/
   script:
-    - $CARGO_BIN/cargo doc
+    - $CARGO_BIN/cargo doc --no-deps
+    - rm -rf public/
     - mv target/doc/ public/
+    - index_file_name=public/index.html
+    - "[ ! -e $index_file_name ] && echo \"<meta http-equiv='refresh' content='0; url=$CI_PROJECT_NAME/index.html'>\" > $index_file_name"
   only:
     - master
