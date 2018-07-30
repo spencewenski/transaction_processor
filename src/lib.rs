@@ -13,6 +13,9 @@ extern crate tokio_core;
 extern crate futures;
 extern crate regex;
 extern crate url;
+#[macro_use]
+extern crate text_io;
+extern crate rpassword;
 
 pub mod transaction;
 pub mod arguments;

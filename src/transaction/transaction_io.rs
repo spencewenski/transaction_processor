@@ -58,7 +58,13 @@ impl TransactionIO {
         let starting_files = get_files_in_dir(config.get_download_path());
 
         let downloader = self.importers.get(&args.src).unwrap();
-        downloader.download(core, &client, &args.src_account);
+        let account = if let Option::Some(ref a) = args.src_account {
+            Option::Some(a.to_owned().into())
+        } else {
+            Option::None
+        };
+        let account = account.unwrap();
+        downloader.download(core, &client, &account);
 
         // Wait for the transactions file to download
         let new_files = web_driver::wait_for_new_files(&mut client,

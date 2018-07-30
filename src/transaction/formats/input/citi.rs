@@ -4,6 +4,7 @@ use std::io;
 use parser;
 use fantoccini::Client;
 use tokio_core;
+use transaction::account::Account;
 
 #[derive(Debug, Deserialize)]
 pub struct CitiTransaction {
@@ -57,7 +58,7 @@ impl TransactionImporter for CitiTransactionImporter {
     fn download(&self,
                 core: &mut tokio_core::reactor::Core,
                 client: &Client,
-                account: &Option<String>) {
+                account: &Account) {
         unimplemented!()
     }
 }
