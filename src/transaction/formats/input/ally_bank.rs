@@ -7,6 +7,7 @@ use fantoccini::{Locator, Element, Client, Form};
 use url::Url;
 use regex::Regex;
 use futures::Future;
+use transaction::account::Account;
 
 // Column titles input Ally exports are prefixed with a space
 #[derive(Debug, Deserialize)]
@@ -61,7 +62,7 @@ impl TransactionImporter for AllyTransactionImporter {
     fn download(&self,
                 core: &mut tokio_core::reactor::Core,
                 client: &Client,
-                account: &Option<String>) {
+                account: &Account) {
         let client = client;
 
         println!("Navigating to website.");
@@ -86,12 +87,11 @@ impl TransactionImporter for AllyTransactionImporter {
         let f = client.form(Locator::Css("form[data-id=\"storefront-login\"]"))
             .and_then(|f| {
                 println!("Filling in username");
-                assert!(false, "Need to set username and password");
-                f.set_by_name("username", "username")
+                f.set_by_name("username", &account.username)
             })
             .and_then(|f| {
                 println!("Filling in password");
-                f.set_by_name("password", "password")
+                f.set_by_name("password", &account.password)
             })
             .and_then(|f| {
                 println!("Submitting form");

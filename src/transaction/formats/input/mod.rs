@@ -5,11 +5,12 @@ use ::transaction::{Transaction};
 use std::io;
 use fantoccini::Client;
 use tokio_core;
+use transaction::account;
 
 pub trait TransactionImporter {
     fn import(&self, r: Box<io::Read>) -> Vec<Transaction>;
     fn download(&self,
                 core: &mut tokio_core::reactor::Core,
                 client: &Client,
-                account: &Option<String>);
+                account: &account::Account);
 }

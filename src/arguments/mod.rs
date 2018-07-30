@@ -1,12 +1,14 @@
 use argparse::{ArgumentParser, Store, StoreTrue, StoreFalse};
 use itertools::Itertools;
 use std::str::FromStr;
+use std::io::{stdout, Write};
+use rpassword;
 
 #[derive(Debug)]
 pub struct Arguments {
     pub src: String,
     pub src_type: SourceType,
-    pub src_account: Option<String>,
+    pub src_account: Option<Account>,
     pub dst_format: String,
     pub src_file: Option<String>,
     pub dst_file: Option<String>,
@@ -37,11 +39,7 @@ impl From<Args> for Arguments {
         Arguments {
             src: a.src,
             src_type: a.src_type,
-            src_account: if a.src_account.len() != 0 {
-                Option::Some(a.src_account)
-            } else {
-                Option::None
-            },
+            src_account: get_account(a.src_account, a.src_username),
             dst_format: a.dst_format,
             src_file: if a.src_file.len() != 0 {
                 Option::Some(a.src_file)
@@ -144,10 +142,90 @@ impl FromStr for SortOrder {
     }
 }
 
+#[derive(Debug)]
+pub struct Account {
+    pub name: String,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Default)]
+struct AccountBuilder {
+    name: String,
+    username: String,
+    password: String,
+}
+
+impl AccountBuilder {
+    fn build(self) -> Account {
+        Account {
+            name: self.name,
+            username: self.username,
+            password: self.password,
+        }
+    }
+
+    fn name(&mut self, name: String) -> &mut AccountBuilder {
+        self.name = name;
+        self
+    }
+
+    fn username(&mut self, username: String) -> &mut AccountBuilder {
+        self.username = username;
+        self
+    }
+
+    fn password(&mut self, password: String) -> &mut AccountBuilder {
+        self.password = password;
+        self
+    }
+}
+
+impl ToOwned for Account {
+    type Owned = Account;
+
+    fn to_owned(&self) -> <Self as ToOwned>::Owned {
+        Account {
+            name: self.name.to_owned(),
+            username: self.username.to_owned(),
+            password: self.password.to_owned(),
+        }
+    }
+}
+
+fn get_account(name: String, username: String) -> Option<Account> {
+    if name.len() == 0 {
+        return Option::None;
+    }
+    let mut builder = AccountBuilder::default();
+    builder.name(name);
+
+    let username = {
+        if username.len() > 0 {
+            username
+        } else {
+            println!();
+            print!("Username: ");
+            stdout().flush();
+            read!()
+        }
+    };
+    builder.username(username);
+
+    let password = {
+        println!();
+        rpassword::prompt_password_stdout("Password: ").unwrap()
+    };
+    builder.password(password);
+
+    Option::Some(builder.build())
+}
+
 struct Args {
     src: String,
     src_type: SourceType,
     src_account: String,
+    src_username: String,
     dst_format: String,
     src_file: String,
     dst_file: String,
@@ -162,6 +240,7 @@ impl Args {
             src: Default::default(),
             src_type: SourceType::File,
             src_account: Default::default(),
+            src_username: Default::default(),
             dst_format: Default::default(),
             src_file: Default::default(),
             dst_file: Default::default(),
@@ -197,6 +276,11 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["-a", "--src-account"],
                         Store,
                         "Name of the account");
+
+        ap.refer(&mut args.src_username)
+            .add_option(&["--src-username"],
+                        Store,
+                        "Username for the source account.");
 
         ap.refer(&mut args.dst_format)
             .add_option(&["-d", "--dst-format"],
