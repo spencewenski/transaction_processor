@@ -1,4 +1,4 @@
-use transaction::Transaction;
+use transaction::{Transaction, TransactionStatus};
 use super::formats::input::*;
 use super::formats::output::*;
 use std::io;
@@ -78,20 +78,18 @@ impl TransactionIO {
     }
 
     pub fn import_files(&self, args: &Arguments, files: HashSet<OsString>) -> Vec<Transaction> {
-        let importer = self.importers.get(&args.src).unwrap();
         let mut transactions = Vec::new();
         for path in files {
             let r = {
                 let f = File::open(path).expect("File not found");
                 Box::new(io::BufReader::new(f))
             };
-            transactions.extend(importer.import(r));
+            transactions.extend(self.import_from_reader(args, r));
         }
         transactions
     }
 
     pub fn import(&self, args: &Arguments) -> Vec<Transaction> {
-        let importer = self.importers.get(&args.src).unwrap();
         let r: Box<io::Read> = match &args.src_file {
             Option::Some(f) => {
                 let f = File::open(f).expect("File not found");
@@ -99,7 +97,14 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdin()),
         };
-        importer.import(r)
+        self.import_from_reader(args, r)
+    }
+
+    fn import_from_reader(&self, args: &Arguments, r: Box<io::Read>) -> Vec<Transaction> {
+        let importer = self.importers.get(&args.src).unwrap();
+        let mut transactions = importer.import(r);
+        let transactions = filter(args, transactions);
+        transactions
     }
 
     pub fn export(&self, args: &Arguments, transactions: Vec<Transaction>) {
@@ -113,4 +118,16 @@ impl TransactionIO {
         };
         exporter.export(w, transactions, args.include_header);
     }
+}
+
+fn filter(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    // We only support filtering pending transactions now, so just bail if we don't want to
+    // ignore pending.
+    if !args.ignore_pending {
+        return transactions;
+    }
+    transactions.retain(|e| {
+        e.status == TransactionStatus::Cleared
+    });
+    transactions
 }

@@ -14,6 +14,7 @@ pub struct Arguments {
     pub dst_file: Option<String>,
     pub sort: Option<Sort>,
     pub include_header: bool,
+    pub ignore_pending: bool,
 }
 
 #[derive(Debug)]
@@ -53,6 +54,7 @@ impl From<Args> for Arguments {
             },
             sort: get_sort(a.sort_by, a.sort_order),
             include_header: a.include_header,
+            ignore_pending: a.ignore_pending,
         }
     }
 }
@@ -232,6 +234,7 @@ struct Args {
     sort_by: String,
     sort_order: String,
     include_header: bool,
+    ignore_pending: bool,
 }
 
 impl Args {
@@ -247,6 +250,7 @@ impl Args {
             sort_by: Default::default(),
             sort_order: Default::default(),
             include_header: true,
+            ignore_pending: false,
         }
     }
 }
@@ -315,6 +319,11 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["--exclude-header"],
                         StoreFalse,
                         "Exclude header in the csv output.");
+
+        ap.refer(&mut args.ignore_pending)
+            .add_option(&["--ignore-pending"],
+                        StoreTrue,
+                        "Ignore pending transactions. Defaults to false");
 
         ap.parse_args_or_exit();
     }
