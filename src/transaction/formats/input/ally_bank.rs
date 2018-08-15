@@ -84,20 +84,22 @@ impl TransactionImporter for AllyTransactionImporter {
         core.run(f).unwrap();
 
         println!("Filling login form.");
-        let f = client.form(Locator::Css("form[data-id=\"storefront-login\"]"))
-            .and_then(|f| {
-                println!("Filling in username");
-                f.set_by_name("username", &account.username)
-            })
-            .and_then(|f| {
-                println!("Filling in password");
-                f.set_by_name("password", &account.password)
-            })
-            .and_then(|f| {
-                println!("Submitting form");
-                f.submit()
-            });
-        core.run(f).unwrap();
+        if let Option::Some(ref c) = account.credentials {
+            let f = client.form(Locator::Css("form[data-id=\"storefront-login\"]"))
+                .and_then(|f| {
+                    println!("Filling in username");
+                    f.set_by_name("username", &c.username)
+                })
+                .and_then(|f| {
+                    println!("Filling in password");
+                    f.set_by_name("password", &c.password)
+                })
+                .and_then(|f| {
+                    println!("Submitting form");
+                    f.submit()
+                });
+            core.run(f).unwrap();
+        }
 
         // Open download button for first account
         let f = client.wait_for_find(Locator::Id("accounts-menu-item"))

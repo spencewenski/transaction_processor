@@ -2,7 +2,7 @@ use transaction::{Transaction, TransactionStatus};
 use super::formats::input::*;
 use super::formats::output::*;
 use std::io;
-use arguments::Arguments;
+use arguments::{Arguments, SortOrder};
 use std::fs::File;
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -13,6 +13,7 @@ use web_driver::config::WebDriverConfig;
 use web_driver;
 use futures::Future;
 use tokio_core;
+use transaction::payee::PayeeNormalizer;
 
 pub struct TransactionIO {
     importers: HashMap<String, Box<TransactionImporter>>,
@@ -100,11 +101,13 @@ impl TransactionIO {
         self.import_from_reader(args, r)
     }
 
+    // Import from the reader and do filtering, sorting, etc.
     fn import_from_reader(&self, args: &Arguments, r: Box<io::Read>) -> Vec<Transaction> {
         let importer = self.importers.get(&args.src).unwrap();
-        let mut transactions = importer.import(r);
+        let transactions = importer.import(r);
         let transactions = filter(args, transactions);
-        transactions
+        let transactions = sort(args, transactions);
+        normalize(args, transactions)
     }
 
     pub fn export(&self, args: &Arguments, transactions: Vec<Transaction>) {
@@ -129,5 +132,31 @@ fn filter(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transacti
     transactions.retain(|e| {
         e.status == TransactionStatus::Cleared
     });
+    transactions
+}
+
+fn sort(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    if let Option::Some(ref sort) = &args.sort {
+        transactions.sort_by(|a, b| {
+            if SortOrder::Ascending == sort.order {
+                a.date().cmp(&b.date())
+            } else {
+                a.date().cmp(&b.date()).reverse()
+            }
+        });
+    }
+    transactions
+}
+
+fn normalize(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    if let Option::Some(ref f) = args.normalize_config {
+        let f = File::open(f).expect("File not found");
+        let r: Box<io::Read> = Box::new(io::BufReader::new(f));
+        let n = PayeeNormalizer::from_reader(r);
+
+        transactions.iter_mut().for_each(|t| {
+            t.normalize_payee(&n);
+        })
+    }
     transactions
 }
