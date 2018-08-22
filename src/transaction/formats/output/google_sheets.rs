@@ -65,6 +65,7 @@ impl From<Transaction> for GoogleSheetsTransaction {
     fn from(transaction: Transaction) -> Self {
         let mut debit: Option<String> = Option::None;
         let mut credit: Option<String> = Option::None;
+        let payee = transaction.payee().to_owned();
         match transaction.transaction_type {
             TransactionType::Debit => debit = Option::Some(transaction.amount),
             TransactionType::Credit => credit = Option::Some(transaction.amount),
@@ -72,7 +73,7 @@ impl From<Transaction> for GoogleSheetsTransaction {
 
         GoogleSheetsTransaction::build(
             format!("{}", transaction.date.format("%m/%d/%Y")),
-            transaction.payee,
+            payee,
             transaction.category,
             debit,
             credit,

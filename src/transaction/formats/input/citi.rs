@@ -56,9 +56,9 @@ impl TransactionImporter for CitiTransactionImporter {
     }
 
     fn download(&self,
-                core: &mut tokio_core::reactor::Core,
-                client: &Client,
-                account: &Account) {
+                _core: &mut tokio_core::reactor::Core,
+                _client: &Client,
+                _account: &Account) {
         unimplemented!()
     }
 }

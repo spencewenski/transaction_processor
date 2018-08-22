@@ -15,6 +15,7 @@ pub struct Arguments {
     pub sort: Option<Sort>,
     pub include_header: bool,
     pub ignore_pending: bool,
+    pub normalize_config: Option<String>,
 }
 
 #[derive(Debug)]
@@ -39,8 +40,8 @@ impl From<Args> for Arguments {
     fn from(a: Args) -> Arguments {
         Arguments {
             src: a.src,
+            src_account: get_account(&a.src_type, a.src_account, a.src_username),
             src_type: a.src_type,
-            src_account: get_account(a.src_account, a.src_username),
             dst_format: a.dst_format,
             src_file: if a.src_file.len() != 0 {
                 Option::Some(a.src_file)
@@ -55,12 +56,17 @@ impl From<Args> for Arguments {
             sort: get_sort(a.sort_by, a.sort_order),
             include_header: a.include_header,
             ignore_pending: a.ignore_pending,
+            normalize_config: if a.normalize_config.len() != 0 {
+                Option::Some(a.normalize_config)
+            } else {
+                Option::None
+            },
         }
     }
 }
 
 fn get_sort(sort_by: String, sort_order: String) -> Option<Sort> {
-    if let Err(e) = SortBy::from_str(&sort_by) {
+    if let Err(_) = SortBy::from_str(&sort_by) {
         return Option::None;
     }
     let mut builder = SortBuilder::new();
@@ -147,6 +153,11 @@ impl FromStr for SortOrder {
 #[derive(Debug)]
 pub struct Account {
     pub name: String,
+    pub credentials: Option<AccountCredentials>,
+}
+
+#[derive(Debug)]
+pub struct AccountCredentials {
     pub username: String,
     pub password: String,
 }
@@ -154,16 +165,15 @@ pub struct Account {
 #[derive(Default)]
 struct AccountBuilder {
     name: String,
-    username: String,
-    password: String,
+    username: Option<String>,
+    password: Option<String>,
 }
 
 impl AccountBuilder {
     fn build(self) -> Account {
         Account {
+            credentials: self.build_credentials(),
             name: self.name,
-            username: self.username,
-            password: self.password,
         }
     }
 
@@ -173,13 +183,25 @@ impl AccountBuilder {
     }
 
     fn username(&mut self, username: String) -> &mut AccountBuilder {
-        self.username = username;
+        self.username = Option::Some(username);
         self
     }
 
     fn password(&mut self, password: String) -> &mut AccountBuilder {
-        self.password = password;
+        self.password = Option::Some(password);
         self
+    }
+
+    fn build_credentials(&self) -> Option<AccountCredentials> {
+        if let Option::None = self.username {
+            return Option::None;
+        } else if let Option::None = self.password {
+            return Option::None;
+        }
+        Option::Some(AccountCredentials {
+            username: self.username.to_owned().unwrap(),
+            password: self.password.to_owned().unwrap(),
+        })
     }
 }
 
@@ -189,18 +211,28 @@ impl ToOwned for Account {
     fn to_owned(&self) -> <Self as ToOwned>::Owned {
         Account {
             name: self.name.to_owned(),
-            username: self.username.to_owned(),
-            password: self.password.to_owned(),
+            credentials: if let Option::Some(ref c) = self.credentials {
+                Option::Some(AccountCredentials {
+                    username: c.username.to_owned(),
+                    password: c.password.to_owned(),
+                })
+            } else {
+                Option::None
+            }
         }
     }
 }
 
-fn get_account(name: String, username: String) -> Option<Account> {
+fn get_account(source_type: &SourceType, name: String, username: String) -> Option<Account> {
     if name.len() == 0 {
         return Option::None;
     }
     let mut builder = AccountBuilder::default();
     builder.name(name);
+
+    if let SourceType::File = source_type {
+        return Option::Some(builder.build());
+    }
 
     let username = {
         if username.len() > 0 {
@@ -208,7 +240,7 @@ fn get_account(name: String, username: String) -> Option<Account> {
         } else {
             println!();
             print!("Username: ");
-            stdout().flush();
+            stdout().flush().unwrap();
             read!()
         }
     };
@@ -235,6 +267,7 @@ struct Args {
     sort_order: String,
     include_header: bool,
     ignore_pending: bool,
+    normalize_config: String,
 }
 
 impl Args {
@@ -251,6 +284,7 @@ impl Args {
             sort_order: Default::default(),
             include_header: true,
             ignore_pending: false,
+            normalize_config: Default::default(),
         }
     }
 }
@@ -324,6 +358,11 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["--ignore-pending"],
                         StoreTrue,
                         "Ignore pending transactions. Defaults to false");
+
+        ap.refer(&mut args.normalize_config)
+            .add_option(&["--normalize-config"],
+                        Store,
+                        "Name of the normalization config file.");
 
         ap.parse_args_or_exit();
     }
