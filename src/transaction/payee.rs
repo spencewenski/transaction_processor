@@ -65,6 +65,7 @@ impl PayeeNormalizer {
          if let Option::Some(p) = self.payees.get(id) {
              return &p.name;
          } else {
+             println!("Payee '{}' was not normalized.", raw_name);
              return raw_name;
          }
     }
