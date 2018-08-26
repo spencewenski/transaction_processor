@@ -2,6 +2,8 @@ use regex::Regex;
 use serde_json;
 use std::io;
 use std::collections::HashMap;
+use transaction::Transaction;
+use arguments::Arguments;
 
 #[derive(Debug)]
 pub struct PayeeNormalizer {
@@ -70,18 +72,53 @@ impl PayeeNormalizer {
         })
     }
 
-    pub fn category_for_payee(&self, account_id: Option<String>, payee_id: &str) -> Option<String> {
+    pub fn category_for_transaction(&self, args: &Arguments, account_id: Option<String>, transaction: &Transaction) -> Option<String> {
+        if let Option::None = transaction.normalized_payee_id {
+            return Option::None;
+        }
         account_id.and_then(|x| {
             self.accounts.get(&x)
         }).and_then(|x| {
-            x.payees.get(payee_id)
+            transaction.normalized_payee_id.as_ref().and_then(|y| {
+                x.payees.get(y)
+            })
         }).and_then(|x| {
-            x.category_id.as_ref()
+            x.category_ids.as_ref()
+        }).and_then(|x| {
+            if x.len() == 0 {
+                return Option::None;
+            }
+            if x.len() == 1 {
+                return x.first();
+            }
+            return self.prompt_select_category_id(args, transaction, x);
         }).and_then(|x| {
             self.categories.get(x)
         }).and_then(|x| {
             Option::Some(x.name.to_owned())
         })
+    }
+
+    fn prompt_select_category_id<'a>(&self, args: &Arguments, transaction: &Transaction, category_ids: &'a Vec<String>) -> Option<&'a String> {
+        if args.skip_prompts {
+            return Option::None
+        }
+        println!();
+        println!("Multiple categories available for transaction [payee: {}], [amount: {}], [date: {}]. Please select an option:",
+                 transaction.payee(), transaction.amount, transaction.date);
+
+        println!("{}. {}", 0, "(skip)");
+        for (i, category_id) in category_ids.iter().enumerate() {
+            if let Option::Some(c) = self.categories.get(category_id) {
+                println!("{}. {}", i + 1, c.name);
+            }
+        }
+        let num: usize = read!();
+        if num == 0 {
+            Option::None
+        } else {
+            category_ids.get(num - 1)
+        }
     }
 }
 
@@ -111,7 +148,7 @@ struct PayeeNormalizeItem {
 pub struct Payee {
     pub id: String,
     pub name: String,
-    pub category_id: Option<String>,
+    pub category_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug)]
@@ -161,7 +198,7 @@ impl From<PayeeInternal> for Payee {
         Payee {
             id: p.id,
             name: p.name,
-            category_id: p.category_id,
+            category_ids: p.category_ids,
         }
     }
 }
@@ -220,8 +257,8 @@ struct PayeeInternal {
     id: String,
     #[serde(rename = "name")]
     name: String,
-    #[serde(rename = "categoryId")]
-    category_id: Option<String>,
+    #[serde(rename = "categoryIds")]
+    category_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
