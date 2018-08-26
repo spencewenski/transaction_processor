@@ -107,7 +107,7 @@ impl TransactionIO {
         let transactions = importer.import(r);
         let transactions = filter(args, transactions);
         let transactions = sort(args, transactions);
-        normalize(args, transactions)
+        normalize_and_categorize(args, transactions)
     }
 
     pub fn export(&self, args: &Arguments, transactions: Vec<Transaction>) {
@@ -148,14 +148,19 @@ fn sort(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction
     transactions
 }
 
-fn normalize(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+fn normalize_and_categorize(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
     if let Option::Some(ref f) = args.normalize_config {
         let f = File::open(f).expect("File not found");
         let r: Box<io::Read> = Box::new(io::BufReader::new(f));
         let n = PayeeNormalizer::from_reader(r);
 
+        let account_id = args.src_account.as_ref().and_then(|x| {
+            Option::Some(x.name.to_owned())
+        });
+
         transactions.iter_mut().for_each(|t| {
-            t.normalize_payee(&n);
+            t.normalize_payee(account_id.to_owned(), &n);
+            t.categorize(account_id.to_owned(), &n);
         })
     }
     transactions

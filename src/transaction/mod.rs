@@ -10,6 +10,7 @@ pub mod account;
 pub struct Transaction {
     date: DateTime<Utc>,
     raw_payee_name: String,
+    normalized_payee_id: Option<String>,
     normalized_payee_name: Option<String>,
     category: Option<String>,
     transaction_type: TransactionType,
@@ -42,6 +43,7 @@ impl Transaction {
         Transaction {
             date: Utc.datetime_from_str(&date, date_format).unwrap(),
             raw_payee_name: InputCleaner::clean(payee),
+            normalized_payee_id: Option::None,
             normalized_payee_name: Option::None,
             category: InputCleaner::clean(category),
             transaction_type,
@@ -51,8 +53,23 @@ impl Transaction {
         }
     }
 
-    pub fn normalize_payee(&mut self, normalizer: &PayeeNormalizer) {
-        self.normalized_payee_name = Option::Some(normalizer.normalize_str(&self.raw_payee_name));
+    pub fn normalize_payee(&mut self, account_id: Option<String>, normalizer: &PayeeNormalizer) {
+        self.normalized_payee_id = normalizer.normalized_payee_id(account_id.to_owned(), &self.raw_payee_name);
+        if let (Option::Some(a), Option::Some(p)) = (&account_id, &self.normalized_payee_id) {
+            let p = normalizer.payee(&a, &p);
+            if let Option::Some(p) = p {
+                self.normalized_payee_name = Option::Some(p.name.to_owned())
+            }
+        }
+    }
+
+    pub fn categorize(&mut self, account_id: Option<String>, normalizer: &PayeeNormalizer) {
+        if let Option::Some(ref id) = self.normalized_payee_id {
+            self.category = normalizer.category_for_payee(account_id, id);
+            if let Option::None = self.category {
+                println!("Transaction was not categorized: [date: {}], [payee: {}], [amount: {}]", self.date, self.payee(), self.amount);
+            }
+        }
     }
 
     pub fn date(&self) -> &DateTime<Utc> {
@@ -62,10 +79,10 @@ impl Transaction {
     // Get the name of the payee for this transaction. Either the raw payee name, or the
     // normalized name if it has been normalized.
     pub fn payee(&self) -> &str {
-        if let Option::Some(ref s) = self.normalized_payee_name {
-            return s;
+        if let Option::Some(ref p) = self.normalized_payee_name {
+            p
         } else {
-            return &self.raw_payee_name;
+            &self.raw_payee_name
         }
     }
 }
