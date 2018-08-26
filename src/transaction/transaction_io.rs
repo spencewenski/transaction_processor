@@ -160,7 +160,7 @@ fn normalize_and_categorize(args: &Arguments, mut transactions: Vec<Transaction>
 
         transactions.iter_mut().for_each(|t| {
             t.normalize_payee(account_id.to_owned(), &n);
-            t.categorize(account_id.to_owned(), &n);
+            t.categorize(args, account_id.to_owned(), &n);
         })
     }
     transactions

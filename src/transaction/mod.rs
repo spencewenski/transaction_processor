@@ -1,5 +1,6 @@
 use chrono::prelude::*;
 use transaction::payee::PayeeNormalizer;
+use arguments::Arguments;
 
 pub mod payee;
 pub mod formats;
@@ -63,12 +64,10 @@ impl Transaction {
         }
     }
 
-    pub fn categorize(&mut self, account_id: Option<String>, normalizer: &PayeeNormalizer) {
-        if let Option::Some(ref id) = self.normalized_payee_id {
-            self.category = normalizer.category_for_payee(account_id, id);
-            if let Option::None = self.category {
-                println!("Transaction was not categorized: [date: {}], [payee: {}], [amount: {}]", self.date, self.payee(), self.amount);
-            }
+    pub fn categorize(&mut self, args: &Arguments, account_id: Option<String>, normalizer: &PayeeNormalizer) {
+        self.category = normalizer.category_for_transaction(args, account_id, &self);
+        if let Option::None = self.category {
+            println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]", self.payee(), self.amount, self.date);
         }
     }
 

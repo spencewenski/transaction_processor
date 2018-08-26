@@ -17,6 +17,7 @@ pub struct Arguments {
     pub include_header: bool,
     pub ignore_pending: bool,
     pub normalize_config: Option<String>,
+    pub skip_prompts: bool,
 }
 
 #[derive(Debug)]
@@ -50,6 +51,7 @@ impl From<Args> for Arguments {
             include_header: a.include_header,
             ignore_pending: a.ignore_pending,
             normalize_config: util::get_optional_string(a.normalize_config),
+            skip_prompts: a.skip_prompts,
         }
     }
 }
@@ -257,6 +259,7 @@ struct Args {
     include_header: bool,
     ignore_pending: bool,
     normalize_config: String,
+    skip_prompts: bool,
 }
 
 impl Args {
@@ -274,6 +277,7 @@ impl Args {
             include_header: true,
             ignore_pending: false,
             normalize_config: Default::default(),
+            skip_prompts: false,
         }
     }
 }
@@ -352,6 +356,11 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["--normalize-config"],
                         Store,
                         "Name of the normalization config file.");
+
+        ap.refer(&mut args.skip_prompts)
+            .add_option(&["--skip-prompts"],
+                        StoreTrue,
+                        "Skip any prompts for optional user input.");
 
         ap.parse_args_or_exit();
     }
