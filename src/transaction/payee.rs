@@ -5,70 +5,92 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct PayeeNormalizer {
-    normalizers: Vec<PayeeNormalizeItem>,
-    payees: HashMap<String, Payee>,
+    accounts: HashMap<String, AccountConfig>,
+    categories: HashMap<String, Category>,
 }
 
 impl PayeeNormalizer {
     pub fn from_reader(r: Box<io::Read>) -> PayeeNormalizer {
         let c: PayeeNormalizeConfigInternal = serde_json::from_reader(r).unwrap();
 
-        let mut normalizers = Vec::new();
-        for normalizer in c.normalizers {
-            normalizers.push(normalizer.into())
+        let mut accounts = HashMap::new();
+        for account in c.accounts {
+            accounts.insert(account.id.to_owned(), account.into());
         }
 
-        let mut payees = HashMap::new();
-        for payee in c.payees {
-            payees.insert(payee.id.to_owned(), payee.into());
+        let mut categories = HashMap::new();
+        for category in c.categories {
+            categories.insert(category.id.to_owned(), category.into());
         }
 
         PayeeNormalizer {
-            normalizers,
-            payees,
+            accounts,
+            categories,
         }
     }
 
-    pub fn normalize_str(&self, s: &str) -> String {
-        for n in &self.normalizers {
-            let cmp_string = {
-                if n.ignore_case {
-                    s.to_lowercase()
-                } else {
-                    s.to_owned()
-                }
-            };
-            match &n.normalize_type {
-                PayeeNormalizeType::Exact(match_string) => {
-                    if match_string == &cmp_string {
-                        return self.get_normalized_name(&n.payee_id, s).to_owned();
+    pub fn normalized_payee_id(&self, account_id: Option<String>, s: &str) -> Option<String> {
+        account_id.as_ref().and_then(|x| {
+            self.accounts.get(x)
+        }).and_then(|x| {
+            for n in &x.normalizers {
+                let cmp_string = {
+                    if n.ignore_case {
+                        s.to_lowercase()
+                    } else {
+                        s.to_owned()
                     }
-                },
-                PayeeNormalizeType::Contains(match_string) => {
-                    if cmp_string.contains(match_string) {
-                        return self.get_normalized_name(&n.payee_id, s).to_owned();
-                    }
-                },
-                PayeeNormalizeType::Regex(re) => {
-                    if re.is_match(&cmp_string) {
-                        return self.get_normalized_name(&n.payee_id, s).to_owned();
+                };
+                match &n.normalize_type {
+                    PayeeNormalizeType::Exact(match_string) => {
+                        if match_string == &cmp_string {
+                            return Option::Some(n.payee_id.to_owned());
+                        }
+                    },
+                    PayeeNormalizeType::Contains(match_string) => {
+                        if cmp_string.contains(match_string) {
+                            return Option::Some(n.payee_id.to_owned());
+                        }
+                    },
+                    PayeeNormalizeType::Regex(re) => {
+                        if re.is_match(&cmp_string) {
+                            return Option::Some(n.payee_id.to_owned());
+                        }
                     }
                 }
             }
-        }
-        println!("Payee '{}' was not normalized.", s);
-        s.to_owned()
+            println!("Payee '{}' was not normalized.", s);
+            Option::None
+        })
     }
 
-    // Get the normalized name of the payee, or the raw payee name if the payee does not exist
-    fn get_normalized_name<'a>(&'a self, id: &'a str, raw_name: &'a str) -> &'a str {
-         if let Option::Some(p) = self.payees.get(id) {
-             return &p.name;
-         } else {
-             println!("Payee '{}' was not normalized.", raw_name);
-             return raw_name;
-         }
+    pub fn payee(&self, account_id: &str, payee_id: &str) -> Option<&Payee> {
+        self.accounts.get(account_id).and_then(|x| {
+            x.payees.get(payee_id)
+        })
     }
+
+    pub fn category_for_payee(&self, account_id: Option<String>, payee_id: &str) -> Option<String> {
+        account_id.and_then(|x| {
+            self.accounts.get(&x)
+        }).and_then(|x| {
+            x.payees.get(payee_id)
+        }).and_then(|x| {
+            x.category_id.as_ref()
+        }).and_then(|x| {
+            self.categories.get(x)
+        }).and_then(|x| {
+            Option::Some(x.name.to_owned())
+        })
+    }
+}
+
+#[derive(Debug)]
+struct AccountConfig {
+    id: String,
+    name: String,
+    normalizers: Vec<PayeeNormalizeItem>,
+    payees: HashMap<String, Payee>,
 }
 
 #[derive(Debug)]
@@ -86,9 +108,36 @@ struct PayeeNormalizeItem {
 }
 
 #[derive(Debug)]
-struct Payee {
+pub struct Payee {
+    pub id: String,
+    pub name: String,
+    pub category_id: Option<String>,
+}
+
+#[derive(Debug)]
+struct Category {
     id: String,
     name: String,
+}
+
+impl From<AccountConfigInternal> for AccountConfig {
+    fn from(a: AccountConfigInternal) -> Self {
+        let mut normalizers = Vec::new();
+        for normalizer in a.normalizers {
+            normalizers.push(normalizer.into())
+        }
+
+        let mut payees = HashMap::new();
+        for payee in a.payees {
+            payees.insert(payee.id.to_owned(), payee.into());
+        }
+        AccountConfig {
+            id: a.id,
+            name: a.name,
+            normalizers,
+            payees,
+        }
+    }
 }
 
 impl From<PayeeNormalizeItemInternal> for PayeeNormalizeItem {
@@ -112,6 +161,16 @@ impl From<PayeeInternal> for Payee {
         Payee {
             id: p.id,
             name: p.name,
+            category_id: p.category_id,
+        }
+    }
+}
+
+impl From<CategoryInternal> for Category {
+    fn from(c: CategoryInternal) -> Self {
+        Category {
+            id: c.id,
+            name: c.name,
         }
     }
 }
@@ -137,6 +196,18 @@ struct PayeeNormalizeItemInternal {
 
 #[derive(Debug, Deserialize)]
 struct PayeeNormalizeConfigInternal {
+    #[serde(rename = "accounts")]
+    accounts: Vec<AccountConfigInternal>,
+    #[serde(rename = "categories")]
+    categories: Vec<CategoryInternal>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AccountConfigInternal {
+    #[serde(rename = "id")]
+    id: String,
+    #[serde(rename = "name")]
+    name: String,
     #[serde(rename = "normalizers")]
     normalizers: Vec<PayeeNormalizeItemInternal>,
     #[serde(rename = "payees")]
@@ -145,6 +216,16 @@ struct PayeeNormalizeConfigInternal {
 
 #[derive(Debug, Deserialize)]
 struct PayeeInternal {
+    #[serde(rename = "id")]
+    id: String,
+    #[serde(rename = "name")]
+    name: String,
+    #[serde(rename = "categoryId")]
+    category_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CategoryInternal {
     #[serde(rename = "id")]
     id: String,
     #[serde(rename = "name")]

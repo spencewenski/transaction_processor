@@ -3,6 +3,7 @@ use itertools::Itertools;
 use std::str::FromStr;
 use std::io::{stdout, Write};
 use rpassword;
+use util;
 
 #[derive(Debug)]
 pub struct Arguments {
@@ -43,24 +44,12 @@ impl From<Args> for Arguments {
             src_account: get_account(&a.src_type, a.src_account, a.src_username),
             src_type: a.src_type,
             dst_format: a.dst_format,
-            src_file: if a.src_file.len() != 0 {
-                Option::Some(a.src_file)
-            } else {
-                Option::None
-            },
-            dst_file: if a.dst_file.len() != 0 {
-                Option::Some(a.dst_file)
-            } else {
-                Option::None
-            },
+            src_file: util::get_optional_string(a.src_file),
+            dst_file: util::get_optional_string(a.dst_file),
             sort: get_sort(a.sort_by, a.sort_order),
             include_header: a.include_header,
             ignore_pending: a.ignore_pending,
-            normalize_config: if a.normalize_config.len() != 0 {
-                Option::Some(a.normalize_config)
-            } else {
-                Option::None
-            },
+            normalize_config: util::get_optional_string(a.normalize_config),
         }
     }
 }
