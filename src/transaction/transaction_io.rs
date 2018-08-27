@@ -13,7 +13,7 @@ use web_driver::config::WebDriverConfig;
 use web_driver;
 use futures::Future;
 use tokio_core;
-use transaction::payee::PayeeNormalizer;
+use config::Config;
 
 pub struct TransactionIO {
     importers: HashMap<String, Box<TransactionImporter>>,
@@ -78,19 +78,19 @@ impl TransactionIO {
         }
     }
 
-    pub fn import_files(&self, args: &Arguments, files: HashSet<OsString>) -> Vec<Transaction> {
+    pub fn import_files(&self, args: &Arguments, config: Option<&Config>, files: HashSet<OsString>) -> Vec<Transaction> {
         let mut transactions = Vec::new();
         for path in files {
             let r = {
                 let f = File::open(path).expect("File not found");
                 Box::new(io::BufReader::new(f))
             };
-            transactions.extend(self.import_from_reader(args, r));
+            transactions.extend(self.import_from_reader(args, config, r));
         }
         transactions
     }
 
-    pub fn import(&self, args: &Arguments) -> Vec<Transaction> {
+    pub fn import(&self, args: &Arguments, config: Option<&Config>) -> Vec<Transaction> {
         let r: Box<io::Read> = match &args.src_file {
             Option::Some(f) => {
                 let f = File::open(f).expect("File not found");
@@ -98,16 +98,16 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdin()),
         };
-        self.import_from_reader(args, r)
+        self.import_from_reader(args, config, r)
     }
 
     // Import from the reader and do filtering, sorting, etc.
-    fn import_from_reader(&self, args: &Arguments, r: Box<io::Read>) -> Vec<Transaction> {
+    fn import_from_reader(&self, args: &Arguments, config: Option<&Config>, r: Box<io::Read>) -> Vec<Transaction> {
         let importer = self.importers.get(&args.src).unwrap();
         let transactions = importer.import(r);
         let transactions = filter(args, transactions);
         let transactions = sort(args, transactions);
-        normalize_and_categorize(args, transactions)
+        normalize_and_categorize(args, config, transactions)
     }
 
     pub fn export(&self, args: &Arguments, transactions: Vec<Transaction>) {
@@ -148,20 +148,13 @@ fn sort(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction
     transactions
 }
 
-fn normalize_and_categorize(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
-    if let Option::Some(ref f) = args.normalize_config {
-        let f = File::open(f).expect("File not found");
-        let r: Box<io::Read> = Box::new(io::BufReader::new(f));
-        let n = PayeeNormalizer::from_reader(r);
-
-        let account_id = args.src_account.as_ref().and_then(|x| {
-            Option::Some(x.name.to_owned())
-        });
-
-        transactions.iter_mut().for_each(|t| {
-            t.normalize_payee(account_id.to_owned(), &n);
-            t.categorize(args, account_id.to_owned(), &n);
-        })
-    }
+fn normalize_and_categorize(args: &Arguments, config: Option<&Config>, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    let account_id = args.src_account.as_ref().and_then(|x| {
+        Option::Some(x.name.to_owned())
+    });
+    transactions.iter_mut().for_each(|t| {
+        t.normalize_payee(account_id.to_owned(), config);
+        t.categorize(args, account_id.to_owned(), config);
+    });
     transactions
 }

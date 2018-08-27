@@ -20,6 +20,7 @@ extern crate rpassword;
 
 pub mod transaction;
 pub mod arguments;
+pub mod config;
 pub mod parser;
 pub mod web_driver;
 pub mod future;
