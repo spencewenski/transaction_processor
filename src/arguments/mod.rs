@@ -16,8 +16,8 @@ pub struct Arguments {
     pub sort: Option<Sort>,
     pub include_header: bool,
     pub ignore_pending: bool,
-    pub normalize_config: Option<String>,
     pub skip_prompts: bool,
+    pub config_file: Option<String>,
 }
 
 #[derive(Debug)]
@@ -50,8 +50,8 @@ impl From<Args> for Arguments {
             sort: get_sort(a.sort_by, a.sort_order),
             include_header: a.include_header,
             ignore_pending: a.ignore_pending,
-            normalize_config: util::get_optional_string(a.normalize_config),
             skip_prompts: a.skip_prompts,
+            config_file: util::get_optional_string(a.config_file),
         }
     }
 }
@@ -258,8 +258,8 @@ struct Args {
     sort_order: String,
     include_header: bool,
     ignore_pending: bool,
-    normalize_config: String,
     skip_prompts: bool,
+    config_file: String,
 }
 
 impl Args {
@@ -276,8 +276,8 @@ impl Args {
             sort_order: Default::default(),
             include_header: true,
             ignore_pending: false,
-            normalize_config: Default::default(),
             skip_prompts: false,
+            config_file: Default::default(),
         }
     }
 }
@@ -352,15 +352,15 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
                         StoreTrue,
                         "Ignore pending transactions. Defaults to false");
 
-        ap.refer(&mut args.normalize_config)
-            .add_option(&["--normalize-config"],
-                        Store,
-                        "Name of the normalization config file.");
-
         ap.refer(&mut args.skip_prompts)
             .add_option(&["--skip-prompts"],
                         StoreTrue,
                         "Skip any prompts for optional user input.");
+
+        ap.refer(&mut args.config_file)
+            .add_option(&["--config-file"],
+                        Store,
+                        "Name of the config file.");
 
         ap.parse_args_or_exit();
     }

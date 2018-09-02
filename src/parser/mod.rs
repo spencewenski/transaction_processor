@@ -1,6 +1,11 @@
 use std::io;
 use csv;
 use serde;
+use serde::{Deserializer, Deserialize};
+use std::str::FromStr;
+use serde::de;
+use std::collections::HashMap;
+use std;
 
 pub fn parse_csv<T>() -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
     parse_csv_from_reader(Box::new(io::stdin()))
@@ -31,4 +36,37 @@ pub fn write_csv_to_writer<T>(values: Vec<T>, has_headers: bool, writer: Box<io:
     for value in values {
         writer.serialize(value).unwrap();
     }
+}
+
+pub fn deserialize_from_str<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+    where D: Deserializer<'de>, T: FromStr
+{
+    let s = <String>::deserialize(deserializer)?;
+    match T::from_str(&s) {
+        Ok(v) => Ok(v),
+        Err(_) => Err(de::Error::custom(format_args!("unable to deserialize {}", s))),
+    }
+}
+
+pub fn deserialize_item_with_key<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
+    where D: Deserializer<'de>, V: Key<K> + Deserialize<'de>, K: std::hash::Hash + std::cmp::Eq + ToOwned
+{
+    let mut m : HashMap<K, V> = HashMap::new();
+    let v : Vec<V> = Vec::deserialize(deserializer)?;
+    for item in v {
+        m.insert(item.key(), item);
+    }
+    Ok(m)
+}
+
+pub trait Key<T> {
+    fn key(&self) -> T;
+}
+
+pub fn default_true() -> bool {
+    true
+}
+
+pub fn default_false() -> bool {
+    false
 }

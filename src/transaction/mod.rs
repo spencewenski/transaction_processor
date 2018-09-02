@@ -1,6 +1,7 @@
 use chrono::prelude::*;
 use transaction::payee::PayeeNormalizer;
 use arguments::Arguments;
+use config::Config;
 
 pub mod payee;
 pub mod formats;
@@ -54,18 +55,23 @@ impl Transaction {
         }
     }
 
-    pub fn normalize_payee(&mut self, account_id: Option<String>, normalizer: &PayeeNormalizer) {
-        self.normalized_payee_id = normalizer.normalized_payee_id(account_id.to_owned(), &self.raw_payee_name);
-        if let (Option::Some(a), Option::Some(p)) = (&account_id, &self.normalized_payee_id) {
-            let p = normalizer.payee(&a, &p);
-            if let Option::Some(p) = p {
-                self.normalized_payee_name = Option::Some(p.name.to_owned())
-            }
-        }
+    pub fn normalize_payee(&mut self, account_id: Option<String>, config: Option<&Config>) {
+        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, account_id.to_owned(), &self.raw_payee_name);
+        self.normalized_payee_name = config.and_then(|c| {
+            account_id.as_ref().and_then(|a| {
+                c.accounts.get(a)
+            })
+        }).and_then(|a| {
+            self.normalized_payee_id.as_ref().and_then(|p| {
+                a.payees.get(p)
+            })
+        }).and_then(|x| {
+            Option::Some(x.name.to_owned())
+        });
     }
 
-    pub fn categorize(&mut self, args: &Arguments, account_id: Option<String>, normalizer: &PayeeNormalizer) {
-        self.category = normalizer.category_for_transaction(args, account_id, &self);
+    pub fn categorize(&mut self, args: &Arguments, account_id: Option<String>, config: Option<&Config>) {
+        self.category = PayeeNormalizer::category_for_transaction(args,config, account_id, &self);
         if let Option::None = self.category {
             println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]", self.payee(), self.amount, self.date);
         }
