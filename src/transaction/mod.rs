@@ -6,7 +6,6 @@ use config::Config;
 pub mod payee;
 pub mod formats;
 pub mod transaction_io;
-pub mod account;
 
 #[derive(Debug)]
 pub struct Transaction {
@@ -55,12 +54,10 @@ impl Transaction {
         }
     }
 
-    pub fn normalize_payee(&mut self, account_id: Option<String>, config: Option<&Config>) {
-        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, account_id.to_owned(), &self.raw_payee_name);
+    pub fn normalize_payee(&mut self, account_id: &str, config: Option<&Config>) {
+        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, account_id, &self.raw_payee_name);
         self.normalized_payee_name = config.and_then(|c| {
-            account_id.as_ref().and_then(|a| {
-                c.accounts.get(a)
-            })
+            c.accounts.get(account_id)
         }).and_then(|a| {
             self.normalized_payee_id.as_ref().and_then(|p| {
                 a.payees.get(p)
@@ -70,7 +67,7 @@ impl Transaction {
         });
     }
 
-    pub fn categorize(&mut self, args: &Arguments, account_id: Option<String>, config: Option<&Config>) {
+    pub fn categorize(&mut self, args: &Arguments, account_id: &str, config: Option<&Config>) {
         self.category = PayeeNormalizer::category_for_transaction(args,config, account_id, &self);
         if let Option::None = self.category {
             println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]", self.payee(), self.amount, self.date);

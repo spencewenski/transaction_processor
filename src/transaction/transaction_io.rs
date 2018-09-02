@@ -4,15 +4,7 @@ use super::formats::output::*;
 use std::io;
 use arguments::{Arguments, SortOrder};
 use std::fs::File;
-use std::collections::HashSet;
-use std::ffi::OsString;
 use std::collections::HashMap;
-use util::*;
-use fantoccini::Client;
-use web_driver::config::WebDriverConfig;
-use web_driver;
-use futures::Future;
-use tokio_core;
 use config::Config;
 
 pub struct TransactionIO {
@@ -51,45 +43,6 @@ impl TransactionIO {
          exporters_list
     }
 
-    pub fn download(&self,
-                    core: &mut tokio_core::reactor::Core,
-                    mut client: &mut Client,
-                    config: &WebDriverConfig,
-                    args: &Arguments) -> HashSet<OsString> {
-        let starting_files = get_files_in_dir(config.get_download_path());
-
-        let downloader = self.importers.get(&args.src).unwrap();
-        let account = if let Option::Some(ref a) = args.src_account {
-            Option::Some(a.to_owned().into())
-        } else {
-            Option::None
-        };
-        let account = account.unwrap();
-        downloader.download(core, &client, &account);
-
-        // Wait for the transactions file to download
-        let new_files = web_driver::wait_for_new_files(&mut client,
-                                                       config.get_download_path(),
-                                                       &starting_files).wait();
-        if let Result::Ok(files) = new_files {
-            return files;
-        } else {
-            return HashSet::new();
-        }
-    }
-
-    pub fn import_files(&self, args: &Arguments, config: Option<&Config>, files: HashSet<OsString>) -> Vec<Transaction> {
-        let mut transactions = Vec::new();
-        for path in files {
-            let r = {
-                let f = File::open(path).expect("File not found");
-                Box::new(io::BufReader::new(f))
-            };
-            transactions.extend(self.import_from_reader(args, config, r));
-        }
-        transactions
-    }
-
     pub fn import(&self, args: &Arguments, config: Option<&Config>) -> Vec<Transaction> {
         let r: Box<io::Read> = match &args.src_file {
             Option::Some(f) => {
@@ -98,12 +51,7 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdin()),
         };
-        self.import_from_reader(args, config, r)
-    }
-
-    // Import from the reader and do filtering, sorting, etc.
-    fn import_from_reader(&self, args: &Arguments, config: Option<&Config>, r: Box<io::Read>) -> Vec<Transaction> {
-        let importer = self.importers.get(&args.src).unwrap();
+        let importer = self.importers.get(&args.src_format).unwrap();
         let transactions = importer.import(r);
         let transactions = filter(args, transactions);
         let transactions = sort(args, transactions);
@@ -149,12 +97,11 @@ fn sort(args: &Arguments, mut transactions: Vec<Transaction>) -> Vec<Transaction
 }
 
 fn normalize_and_categorize(args: &Arguments, config: Option<&Config>, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
-    let account_id = args.src_account.as_ref().and_then(|x| {
-        Option::Some(x.name.to_owned())
-    });
-    transactions.iter_mut().for_each(|t| {
-        t.normalize_payee(account_id.to_owned(), config);
-        t.categorize(args, account_id.to_owned(), config);
-    });
+    if let Option::Some(ref a) = args.src_account {
+        transactions.iter_mut().for_each(|t| {
+            t.normalize_payee(a, config);
+            t.categorize(args, a, config);
+        });
+    }
     transactions
 }

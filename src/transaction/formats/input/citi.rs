@@ -2,9 +2,6 @@ use transaction::{Transaction, TransactionStatus, TransactionType};
 use super::TransactionImporter;
 use std::io;
 use parser;
-use fantoccini::Client;
-use tokio_core;
-use transaction::account::Account;
 
 #[derive(Debug, Deserialize)]
 pub struct CitiTransaction {
@@ -53,13 +50,6 @@ impl TransactionImporter for CitiTransactionImporter {
         transactions.into_iter().map(|t| {
             Transaction::from(t)
         }).collect()
-    }
-
-    fn download(&self,
-                _core: &mut tokio_core::reactor::Core,
-                _client: &Client,
-                _account: &Account) {
-        unimplemented!()
     }
 }
 
