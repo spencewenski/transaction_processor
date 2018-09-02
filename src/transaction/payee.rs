@@ -8,11 +8,9 @@ pub struct PayeeNormalizer {
 }
 
 impl PayeeNormalizer {
-    pub fn normalized_payee_id(config: Option<&Config>, account_id: Option<String>, s: &str) -> Option<String> {
+    pub fn normalized_payee_id(config: Option<&Config>, account_id: &str, s: &str) -> Option<String> {
         config.and_then(|c| {
-            account_id.as_ref().and_then(|a| {
-                c.accounts.get(a)
-            })
+            c.accounts.get(account_id)
         }).and_then(|x| {
             for n in &x.payee_normalizers {
                 match &n.normalizer_type {
@@ -54,14 +52,12 @@ impl PayeeNormalizer {
         }
     }
 
-    pub fn category_for_transaction(args: &Arguments, config: Option<&Config>, account_id: Option<String>, transaction: &Transaction) -> Option<String> {
+    pub fn category_for_transaction(args: &Arguments, config: Option<&Config>, account_id: &str, transaction: &Transaction) -> Option<String> {
         if let Option::None = transaction.normalized_payee_id {
             return Option::None;
         }
         config.and_then(|c| {
-            account_id.as_ref().and_then(|a| {
-                c.accounts.get(a)
-            })
+            c.accounts.get(account_id)
         }).and_then(|a| {
             transaction.normalized_payee_id.as_ref().and_then(|p| {
                 a.payees.get(p)

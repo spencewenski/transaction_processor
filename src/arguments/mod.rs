@@ -1,15 +1,12 @@
 use argparse::{ArgumentParser, Store, StoreTrue, StoreFalse};
 use itertools::Itertools;
 use std::str::FromStr;
-use std::io::{stdout, Write};
-use rpassword;
 use util;
 
 #[derive(Debug)]
 pub struct Arguments {
-    pub src: String,
-    pub src_type: SourceType,
-    pub src_account: Option<Account>,
+    pub src_format: String,
+    pub src_account: Option<String>,
     pub dst_format: String,
     pub src_file: Option<String>,
     pub dst_file: Option<String>,
@@ -41,9 +38,8 @@ impl FromStr for SourceType {
 impl From<Args> for Arguments {
     fn from(a: Args) -> Arguments {
         Arguments {
-            src: a.src,
-            src_account: get_account(&a.src_type, a.src_account, a.src_username),
-            src_type: a.src_type,
+            src_format: a.src_format,
+            src_account: util::get_optional_string(a.src_account),
             dst_format: a.dst_format,
             src_file: util::get_optional_string(a.src_file),
             dst_file: util::get_optional_string(a.dst_file),
@@ -141,116 +137,9 @@ impl FromStr for SortOrder {
     }
 }
 
-#[derive(Debug)]
-pub struct Account {
-    pub name: String,
-    pub credentials: Option<AccountCredentials>,
-}
-
-#[derive(Debug)]
-pub struct AccountCredentials {
-    pub username: String,
-    pub password: String,
-}
-
-#[derive(Default)]
-struct AccountBuilder {
-    name: String,
-    username: Option<String>,
-    password: Option<String>,
-}
-
-impl AccountBuilder {
-    fn build(self) -> Account {
-        Account {
-            credentials: self.build_credentials(),
-            name: self.name,
-        }
-    }
-
-    fn name(&mut self, name: String) -> &mut AccountBuilder {
-        self.name = name;
-        self
-    }
-
-    fn username(&mut self, username: String) -> &mut AccountBuilder {
-        self.username = Option::Some(username);
-        self
-    }
-
-    fn password(&mut self, password: String) -> &mut AccountBuilder {
-        self.password = Option::Some(password);
-        self
-    }
-
-    fn build_credentials(&self) -> Option<AccountCredentials> {
-        if let Option::None = self.username {
-            return Option::None;
-        } else if let Option::None = self.password {
-            return Option::None;
-        }
-        Option::Some(AccountCredentials {
-            username: self.username.to_owned().unwrap(),
-            password: self.password.to_owned().unwrap(),
-        })
-    }
-}
-
-impl ToOwned for Account {
-    type Owned = Account;
-
-    fn to_owned(&self) -> <Self as ToOwned>::Owned {
-        Account {
-            name: self.name.to_owned(),
-            credentials: if let Option::Some(ref c) = self.credentials {
-                Option::Some(AccountCredentials {
-                    username: c.username.to_owned(),
-                    password: c.password.to_owned(),
-                })
-            } else {
-                Option::None
-            }
-        }
-    }
-}
-
-fn get_account(source_type: &SourceType, name: String, username: String) -> Option<Account> {
-    if name.len() == 0 {
-        return Option::None;
-    }
-    let mut builder = AccountBuilder::default();
-    builder.name(name);
-
-    if let SourceType::File = source_type {
-        return Option::Some(builder.build());
-    }
-
-    let username = {
-        if username.len() > 0 {
-            username
-        } else {
-            println!();
-            print!("Username: ");
-            stdout().flush().unwrap();
-            read!()
-        }
-    };
-    builder.username(username);
-
-    let password = {
-        println!();
-        rpassword::prompt_password_stdout("Password: ").unwrap()
-    };
-    builder.password(password);
-
-    Option::Some(builder.build())
-}
-
 struct Args {
-    src: String,
-    src_type: SourceType,
+    src_format: String,
     src_account: String,
-    src_username: String,
     dst_format: String,
     src_file: String,
     dst_file: String,
@@ -265,10 +154,8 @@ struct Args {
 impl Args {
     fn new() -> Args {
         Args {
-            src: Default::default(),
-            src_type: SourceType::File,
+            src_format: Default::default(),
             src_account: Default::default(),
-            src_username: Default::default(),
             dst_format: Default::default(),
             src_file: Default::default(),
             dst_file: Default::default(),
@@ -284,34 +171,22 @@ impl Args {
 
 pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Arguments {
     let mut args = Args::new();
-    let src_options = format!("Source account. One of [{}]", src_formats.iter().sorted().iter().join(", "));
-    let src_type_options = format!("Source type.");
+    let src_options = format!("Source file format. One of [{}]", src_formats.iter().sorted().iter().join(", "));
     let dst_options = format!("Destination format. One of [{}]", dst_formats.iter().sorted().iter().join(", "));
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Transaction processor");
 
-        ap.refer(&mut args.src)
-            .add_option(&["-s", "--src"],
+        ap.refer(&mut args.src_format)
+            .add_option(&["-s", "--src-format"],
                         Store,
                         &src_options)
-            .required();
-
-        ap.refer(&mut args.src_type)
-            .add_option(&["-t", "--src-type"],
-                        Store,
-                        &src_type_options)
             .required();
 
         ap.refer(&mut args.src_account)
             .add_option(&["-a", "--src-account"],
                         Store,
                         "Name of the account");
-
-        ap.refer(&mut args.src_username)
-            .add_option(&["--src-username"],
-                        Store,
-                        "Username for the source account.");
 
         ap.refer(&mut args.dst_format)
             .add_option(&["-d", "--dst-format"],
