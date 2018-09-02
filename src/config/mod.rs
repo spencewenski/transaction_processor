@@ -1,8 +1,7 @@
 use serde_json;
 use std::io;
-use regex::Regex;
-use parser::{deserialize_from_str, deserialize_item_with_key, Key, default_false, default_true};
-use std::collections::{HashSet, HashMap};
+use parser::{deserialize_item_with_key, Key, default_false, default_true};
+use std::collections::{HashMap};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -81,8 +80,9 @@ pub enum MatcherType {
     },
     #[serde(rename = "Regex")]
     Regex {
-        #[serde(rename = "matchString", deserialize_with = "deserialize_from_str")]
-        regex_string: Regex,
+        // Todo: figure out how to deserialize this directly into a Regex and also respect the ignoreCase option
+        #[serde(rename = "matchString")]
+        regex_string: String,
     },
 }
 
@@ -93,7 +93,7 @@ pub struct Payee {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "categoryIds")]
-    pub category_ids: Option<HashSet<String>>,
+    pub category_ids: Option<Vec<String>>,
 }
 
 impl Key<String> for Payee {

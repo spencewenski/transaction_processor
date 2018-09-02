@@ -1,7 +1,7 @@
 use transaction::Transaction;
 use arguments::Arguments;
 use config::{Config, MatcherType};
-use std::collections::HashSet;
+use regex::RegexBuilder;
 
 #[derive(Debug)]
 pub struct PayeeNormalizer {
@@ -15,26 +15,27 @@ impl PayeeNormalizer {
             })
         }).and_then(|x| {
             for n in &x.payee_normalizers {
-                let cmp_string = {
-                    if n.ignore_case {
-                        s.to_lowercase()
-                    } else {
-                        s.to_owned()
-                    }
-                };
                 match &n.normalizer_type {
                     MatcherType::Exact {exact_match_string} => {
-                        if exact_match_string == &cmp_string {
+                        let cmp_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, s);
+                        let exact_match_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, exact_match_string);
+                        if exact_match_string == cmp_string {
                             return Option::Some(n.payee_id.to_owned());
                         }
                     },
                     MatcherType::Contains {contains_string} => {
-                        if cmp_string.contains(contains_string) {
+                        let cmp_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, s);
+                        let contains_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, contains_string);
+                        if cmp_string.contains(&contains_string) {
                             return Option::Some(n.payee_id.to_owned());
                         }
                     },
                     MatcherType::Regex {regex_string} => {
-                        if regex_string.is_match(&cmp_string) {
+                        let re = RegexBuilder::new(regex_string)
+                            .case_insensitive(n.ignore_case)
+                            .build()
+                            .expect("Invalid regex");
+                        if re.is_match(s) {
                             return Option::Some(n.payee_id.to_owned());
                         }
                     }
@@ -43,6 +44,14 @@ impl PayeeNormalizer {
             println!("Payee '{}' was not normalized.", s);
             Option::None
         })
+    }
+
+    fn maybe_to_lower(ignore_case: bool, s: &str) -> String {
+        if ignore_case {
+            s.to_lowercase()
+        } else {
+            s.to_owned()
+        }
     }
 
     pub fn category_for_transaction(args: &Arguments, config: Option<&Config>, account_id: Option<String>, transaction: &Transaction) -> Option<String> {
@@ -64,7 +73,7 @@ impl PayeeNormalizer {
                 return Option::None;
             }
             if c.len() == 1 {
-                return c.iter().last();
+                return c.first()
             }
             return PayeeNormalizer::prompt_select_category_id(args, config, transaction, c)
         }).and_then(|x| {
@@ -76,7 +85,7 @@ impl PayeeNormalizer {
         })
     }
 
-    fn prompt_select_category_id<'a>(args: &Arguments, config: Option<&'a Config>, transaction: &Transaction, category_ids: &'a HashSet<String>) -> Option<&'a String> {
+    fn prompt_select_category_id<'a>(args: &Arguments, config: Option<&'a Config>, transaction: &Transaction, category_ids: &'a Vec<String>) -> Option<&'a String> {
         let skip_prompts = args.skip_prompts || config.and_then(|x| {
             Option::Some(x.skip_prompts)
         }).unwrap_or(false);
@@ -89,23 +98,17 @@ impl PayeeNormalizer {
                      transaction.payee(), transaction.amount, transaction.date);
 
             println!("{}. {}", 0, "(skip)");
-            let mut ids = Vec::new();
             for (i, category_id) in category_ids.iter().enumerate() {
                 if let Option::Some(c) = c.categories.get(category_id) {
-                    ids.push(c.id.to_owned());
                     println!("{}. {}", i + 1, c.name);
                 }
             }
-            let ids = ids;
             let num: usize = read!();
             if num == 0 {
                 return Option::None
+            } else {
+                category_ids.get(num - 1)
             }
-            ids.get(num - 1).and_then(|x| {
-                c.categories.get(x).and_then(|c| {
-                    Option::Some(&c.id)
-                })
-            })
         })
     }
 }
