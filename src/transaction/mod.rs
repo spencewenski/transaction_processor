@@ -4,7 +4,6 @@ use arguments::Arguments;
 use config::Config;
 
 pub mod payee;
-pub mod formats;
 pub mod transaction_io;
 
 #[derive(Debug)]
@@ -34,7 +33,7 @@ enum TransactionStatus {
 
 impl Transaction {
     fn build(date: String,
-             date_format: &str,
+             date_format: String,
              payee: String,
              category: Option<String>,
              transaction_type: TransactionType,
@@ -42,7 +41,7 @@ impl Transaction {
              status: TransactionStatus,
              memo: Option<String>) -> Transaction {
         Transaction {
-            date: Utc.datetime_from_str(&date, date_format).unwrap(),
+            date: Utc.datetime_from_str(&date, &date_format).unwrap(),
             raw_payee_name: InputCleaner::clean(payee),
             normalized_payee_id: Option::None,
             normalized_payee_name: Option::None,
@@ -54,11 +53,9 @@ impl Transaction {
         }
     }
 
-    pub fn normalize_payee(&mut self, account_id: &str, config: Option<&Config>) {
+    pub fn normalize_payee(&mut self, account_id: &str, config: &Config) {
         self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, account_id, &self.raw_payee_name);
-        self.normalized_payee_name = config.and_then(|c| {
-            c.accounts.get(account_id)
-        }).and_then(|a| {
+        self.normalized_payee_name = config.accounts.get(account_id).and_then(|a| {
             self.normalized_payee_id.as_ref().and_then(|p| {
                 a.payees.get(p)
             })
@@ -67,8 +64,8 @@ impl Transaction {
         });
     }
 
-    pub fn categorize(&mut self, args: &Arguments, account_id: &str, config: Option<&Config>) {
-        self.category = PayeeNormalizer::category_for_transaction(args,config, account_id, &self);
+    pub fn categorize(&mut self, args: &Arguments, account_id: &str, config: &Config) {
+        self.category = PayeeNormalizer::category_for_transaction(args, config, account_id, &self);
         if let Option::None = self.category {
             println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]", self.payee(), self.amount, self.date);
         }

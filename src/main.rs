@@ -6,11 +6,9 @@ use transaction_processor::util;
 use transaction_processor::config::Config;
 
 fn main() {
-    let transaction_io = TransactionIO::new();
-    let args = parse_args(transaction_io.list_importers(),
-                                     transaction_io.list_exporters());
+    let args = parse_args();
 
-    let c = args.config_file.as_ref().and_then(|x| {
+    args.config_file.as_ref().and_then(|x| {
         Option::Some(util::reader_from_file_name(&x))
     }).and_then(|x | {
         match Config::from_reader(x) {
@@ -20,9 +18,11 @@ fn main() {
                 Option::None
             }
         }
+    }).and_then(|c| {
+        let transactions = TransactionIO::import(&args, &c);
+
+        TransactionIO::export(&args, &c, transactions);
+
+        Option::Some(())
     });
-
-    let transactions = transaction_io.import(&args, c.as_ref());
-
-    transaction_io.export(&args, transactions);
 }

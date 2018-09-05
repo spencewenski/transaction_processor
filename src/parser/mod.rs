@@ -1,11 +1,11 @@
-use std::io;
-use csv;
-use serde;
-use serde::{Deserializer, Deserialize};
-use std::str::FromStr;
-use serde::de;
-use std::collections::HashMap;
 use std;
+use std::io;
+use std::str::FromStr;
+use std::collections::HashMap;
+use csv;
+use csv::Writer;
+use serde;
+use serde::{Deserializer, Deserialize, de};
 
 pub fn parse_csv<T>() -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
     parse_csv_from_reader(Box::new(io::stdin()))
@@ -30,12 +30,16 @@ pub fn write_csv<T>(values: Vec<T>, has_headers: bool) where T: serde::Serialize
 }
 
 pub fn write_csv_to_writer<T>(values: Vec<T>, has_headers: bool, writer: Box<io::Write>) where T: serde::Serialize {
-    let mut writer = csv::WriterBuilder::new()
-        .has_headers(has_headers)
-        .from_writer(writer);
+    let mut writer = create_csv_writer(has_headers, writer);
     for value in values {
         writer.serialize(value).unwrap();
     }
+}
+
+pub fn create_csv_writer(has_headers: bool, writer: Box<io::Write>) -> Writer<Box<io::Write>> {
+    csv::WriterBuilder::new()
+        .has_headers(has_headers)
+        .from_writer(writer)
 }
 
 pub fn deserialize_from_str<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -48,8 +52,8 @@ pub fn deserialize_from_str<'de, D, T>(deserializer: D) -> Result<T, D::Error>
     }
 }
 
-pub fn deserialize_item_with_key<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
-    where D: Deserializer<'de>, V: Key<K> + Deserialize<'de>, K: std::hash::Hash + std::cmp::Eq + ToOwned
+pub fn deserialize_keyed_items<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
+    where D: Deserializer<'de>, V: Keyed<K> + Deserialize<'de>, K: std::hash::Hash + std::cmp::Eq + ToOwned
 {
     let mut m : HashMap<K, V> = HashMap::new();
     let v : Vec<V> = Vec::deserialize(deserializer)?;
@@ -59,7 +63,7 @@ pub fn deserialize_item_with_key<'de, D, K, V>(deserializer: D) -> Result<HashMa
     Ok(m)
 }
 
-pub trait Key<T> {
+pub trait Keyed<T> {
     fn key(&self) -> T;
 }
 
