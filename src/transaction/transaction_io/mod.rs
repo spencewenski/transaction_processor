@@ -18,7 +18,11 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdin()),
         };
-        config.formats.get(&args.src_format).and_then(|f| {
+        args.src_account.as_ref().and_then(|a| {
+            config.accounts.get(a)
+        }).and_then(|a| {
+            config.formats.get(&a.format_id)
+        }).and_then(|f| {
             let transactions = formats::import_from_configurable_format(r, f);
             let transactions = filter(args, transactions);
             let transactions = sort(args, transactions);

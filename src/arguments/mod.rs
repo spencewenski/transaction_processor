@@ -4,7 +4,6 @@ use util;
 
 #[derive(Debug)]
 pub struct Arguments {
-    pub src_format: String,
     pub src_account: Option<String>,
     pub dst_format: String,
     pub src_file: Option<String>,
@@ -37,7 +36,6 @@ impl FromStr for SourceType {
 impl From<Args> for Arguments {
     fn from(a: Args) -> Arguments {
         Arguments {
-            src_format: a.src_format,
             src_account: util::get_optional_string(a.src_account),
             dst_format: a.dst_format,
             src_file: util::get_optional_string(a.src_file),
@@ -137,7 +135,6 @@ impl FromStr for SortOrder {
 }
 
 struct Args {
-    src_format: String,
     src_account: String,
     dst_format: String,
     src_file: String,
@@ -153,7 +150,6 @@ struct Args {
 impl Args {
     fn new() -> Args {
         Args {
-            src_format: Default::default(),
             src_account: Default::default(),
             dst_format: Default::default(),
             src_file: Default::default(),
@@ -181,20 +177,16 @@ pub fn parse_args() -> Arguments {
                         "Name of the config file.")
             .required();
 
-        ap.refer(&mut args.src_format)
-            .add_option(&["-s", "--src-format"],
-                        Store,
-                        "Source data format.");
-
         ap.refer(&mut args.src_account)
             .add_option(&["-a", "--src-account"],
                         Store,
-                        "Name of the account");
+                        "Id of the account")
+            .required();
 
         ap.refer(&mut args.dst_format)
             .add_option(&["-d", "--dst-format"],
                         Store,
-                        "Destination data format")
+                        "Id of the destination data format")
             .required();
 
         ap.refer(&mut args.src_file)
