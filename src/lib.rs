@@ -9,6 +9,8 @@ extern crate itertools;
 extern crate regex;
 #[macro_use]
 extern crate text_io;
+extern crate currency;
+extern crate num;
 
 pub mod transaction;
 pub mod arguments;
