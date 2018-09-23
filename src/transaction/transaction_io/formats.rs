@@ -6,6 +6,7 @@ use config::{FormatConfig, AmountFormat};
 use currency::{Currency};
 use num::{Signed};
 use std::ops::Neg;
+use config::Config;
 
 pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Vec<Transaction> {
     let unmapped_transactions : Vec<HashMap<String, String>> = parse_csv_from_reader(r);
@@ -142,13 +143,13 @@ fn get_category(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Option<
 }
 
 /// Assumes CSV
-pub fn export_to_configurable_format(w: Box<io::Write>, f: &FormatConfig, transactions: Vec<Transaction>) {
-    let mut w = create_csv_writer(f.include_header, w);
-    if f.include_header {
-        w.write_record(&f.field_order);
+pub fn export_to_configurable_format(w: Box<io::Write>, c: &Config, f: &FormatConfig, transactions: Vec<Transaction>) {
+    let mut w = create_csv_writer(c.include_header(), w);
+    if c.include_header() {
+        w.write_record(&f.field_order).expect("Error writing record");
     }
     transactions.iter().for_each(|t| {
-        w.write_record(convert_to_configurable_format(f, t));
+        w.write_record(convert_to_configurable_format(f, t)).expect("Error writing record");
     });
 }
 

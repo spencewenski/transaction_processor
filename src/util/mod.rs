@@ -33,7 +33,9 @@ pub fn get_optional_string(s: String) -> Option<String> {
     }
 }
 
-pub fn reader_from_file_name(f: &str) -> Box<io::Read> {
-    let f = File::open(f).expect("File not found");
-    Box::new(io::BufReader::new(f))
+pub fn reader_from_file_name(filename: &str) -> Result<Box<io::Read>, String> {
+    match File::open(filename) {
+        Ok(f) => Ok(Box::new(io::BufReader::new(f))),
+        Err(e) => Err(format!("Unable to open file [{}]: {}", filename, e)),
+    }
 }

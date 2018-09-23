@@ -1,6 +1,5 @@
 use chrono::prelude::*;
 use transaction::payee::PayeeNormalizer;
-use arguments::Arguments;
 use config::Config;
 use currency::Currency;
 use num::{Signed};
@@ -57,9 +56,9 @@ impl Transaction {
         }
     }
 
-    pub fn normalize_payee(&mut self, account_id: &str, config: &Config) {
-        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, account_id, &self.raw_payee_name);
-        self.normalized_payee_name = config.accounts.get(account_id).and_then(|a| {
+    pub fn normalize_payee(&mut self, config: &Config) {
+        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, &self.raw_payee_name);
+        self.normalized_payee_name = config.account().and_then(|a| {
             self.normalized_payee_id.as_ref().and_then(|p| {
                 a.payees.get(p)
             })
@@ -68,8 +67,8 @@ impl Transaction {
         });
     }
 
-    pub fn categorize(&mut self, args: &Arguments, account_id: &str, config: &Config) {
-        self.category = PayeeNormalizer::category_for_transaction(args, config, account_id, &self);
+    pub fn categorize(&mut self, config: &Config) {
+        self.category = PayeeNormalizer::category_for_transaction(config, &self);
         if let Option::None = self.category {
             println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]", self.payee(), self.amount, self.date);
         }
