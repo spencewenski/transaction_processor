@@ -2,6 +2,9 @@ use chrono::prelude::*;
 use transaction::payee::PayeeNormalizer;
 use arguments::Arguments;
 use config::Config;
+use currency::Currency;
+use num::{Signed};
+use std::ops::Neg;
 
 pub mod payee;
 pub mod transaction_io;
@@ -14,7 +17,8 @@ pub struct Transaction {
     normalized_payee_name: Option<String>,
     category: Option<String>,
     transaction_type: TransactionType,
-    amount: String,
+    // Non-negative
+    amount: Currency,
     status: TransactionStatus,
     memo: Option<String>,
 }
@@ -37,7 +41,7 @@ impl Transaction {
              payee: String,
              category: Option<String>,
              transaction_type: TransactionType,
-             amount: String,
+             amount: Currency,
              status: TransactionStatus,
              memo: Option<String>) -> Transaction {
         Transaction {
@@ -47,7 +51,7 @@ impl Transaction {
             normalized_payee_name: Option::None,
             category: InputCleaner::clean(category),
             transaction_type,
-            amount: InputCleaner::clean(amount),
+            amount: get_currency_absolute_value(amount),
             status,
             memo: InputCleaner::clean(memo),
         }
@@ -86,6 +90,13 @@ impl Transaction {
     }
 }
 
+fn get_currency_absolute_value(c: Currency) -> Currency {
+    if c.value().is_negative() {
+        c.neg()
+    } else {
+        c
+    }
+}
 
 struct InputCleaner;
 trait Clean<T> {

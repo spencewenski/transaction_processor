@@ -3,7 +3,9 @@ use parser::{parse_csv_from_reader, create_csv_writer};
 use std::collections::HashMap;
 use transaction::{Transaction, TransactionStatus, TransactionType};
 use config::{FormatConfig, AmountFormat};
-use util;
+use currency::{Currency};
+use num::{Signed};
+use std::ops::Neg;
 
 pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Vec<Transaction> {
     let unmapped_transactions : Vec<HashMap<String, String>> = parse_csv_from_reader(r);
@@ -17,7 +19,6 @@ pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Ve
 
 fn convert_to_transaction(unmapped: HashMap<String, String>, f: &FormatConfig) -> Transaction {
     let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f);
-    let amount = clean_amount_string(amount);
     let (date_time_string, date_time_format) = get_date_time_and_format(&unmapped, f);
     Transaction::build(date_time_string,
                        date_time_format,
@@ -60,17 +61,14 @@ fn get_date_time_and_format(unmapped: &HashMap<String, String>, f: &FormatConfig
     (date_time_string, format)
 }
 
-const DEFAULT_AMOUNT: &'static str = "0";
-const DEBIT_PREFIX: &'static str = "-";
-
-fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &FormatConfig) -> (String, TransactionType) {
+fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &FormatConfig) -> (Currency, TransactionType) {
     match f.amount_config.format {
         AmountFormat::SingleAmountField(ref c) => {
             let amount = unmapped.get(&c.field_name).and_then(|x| {
-                Option::Some(x.to_owned())
-            }).unwrap_or(String::from(DEFAULT_AMOUNT));
+                Option::Some(get_currency_from_str(x))
+            }).unwrap_or(Default::default());
 
-            let transaction_type = if amount.trim().starts_with(DEBIT_PREFIX) {
+            let transaction_type = if amount.value().is_negative() {
                 TransactionType::Debit
             } else {
                 TransactionType::Credit
@@ -80,13 +78,13 @@ fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &Forma
         },
         AmountFormat::SeparateDebitCreditFields(ref c) => {
             if let Option::Some(amount) = unmapped.get(&c.debit_field).and_then(|x| {
-                util::get_optional_string(x.to_owned())
+                Option::Some(get_currency_from_str(x))
             }) {
                 return (amount, TransactionType::Debit);
             }
 
             if let Option::Some(amount) = unmapped.get(&c.credit_field).and_then(|x| {
-                util::get_optional_string(x.to_owned())
+                Option::Some(get_currency_from_str(x))
             }) {
                 return (amount, TransactionType::Credit);
             }
@@ -95,8 +93,8 @@ fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &Forma
         },
         AmountFormat::TransactionTypeAndAmountFields(ref c) => {
             let amount = unmapped.get(&c.amount_field).and_then(|x| {
-                Option::Some(x.to_owned())
-            }).unwrap_or(String::from(DEFAULT_AMOUNT));
+                Option::Some(get_currency_from_str(x))
+            }).unwrap_or(Default::default());
             let transaction_type = unmapped.get(&c.transaction_type_field).and_then(|x| {
                 if x == &c.credit_string {
                     return Option::Some(TransactionType::Credit);
@@ -110,8 +108,8 @@ fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &Forma
     }
 }
 
-fn clean_amount_string(a: String) -> String {
-    a.trim().trim_left_matches(DEBIT_PREFIX).to_owned()
+fn get_currency_from_str(s: &str) -> Currency {
+    Currency::from_str(s).expect(&format!("Unable to parse amount into a valid currency: {}", s))
 }
 
 fn get_transaction_status(unmapped: &HashMap<String, String>, f: &FormatConfig) -> TransactionStatus {
@@ -209,18 +207,22 @@ fn get_amount_fields(f: &FormatConfig, t: &Transaction) -> Vec<(String, String)>
     match f.amount_config.format {
         AmountFormat::SingleAmountField(ref c) => {
             let amount = match t.transaction_type {
-                TransactionType::Debit => format!("{}{}", DEBIT_PREFIX, t.amount),
-                TransactionType::Credit => t.amount.to_owned(),
+                TransactionType::Debit => currency_to_string_without_delim(&t.amount.to_owned().neg()),
+                TransactionType::Credit => currency_to_string_without_delim(&t.amount),
             };
             r.push((c.field_name.to_owned(), amount));
         },
         AmountFormat::SeparateDebitCreditFields(ref c) => {
             let (debit_amount, credit_amount) = match t.transaction_type {
-                TransactionType::Debit => (t.amount.to_owned(), Default::default()),
-                TransactionType::Credit => (Default::default(), t.amount.to_owned()),
+                TransactionType::Debit => (Option::Some(&t.amount), Option::None),
+                TransactionType::Credit => (Option::None, Option::Some(&t.amount)),
             };
-            r.push((c.debit_field.to_owned(), debit_amount));
-            r.push((c.credit_field.to_owned(), credit_amount));
+            r.push((c.debit_field.to_owned(), debit_amount.map_or(Default::default(), |x| {
+                currency_to_string_without_delim(x)
+            })));
+            r.push((c.credit_field.to_owned(), credit_amount.map_or(Default::default(), |x| {
+                currency_to_string_without_delim(x)
+            })));
         },
         AmountFormat::TransactionTypeAndAmountFields(ref c) => {
             let transaction_type = match t.transaction_type {
@@ -228,13 +230,20 @@ fn get_amount_fields(f: &FormatConfig, t: &Transaction) -> Vec<(String, String)>
                 TransactionType::Credit => c.credit_string.to_owned(),
             };
             let amount = if t.transaction_type == TransactionType::Debit && c.include_debit_sign {
-                format!("{}{}", DEBIT_PREFIX, t.amount)
+                t.amount.to_owned().neg()
             } else {
                 t.amount.to_owned()
             };
             r.push((c.transaction_type_field.to_owned(), transaction_type));
-            r.push((c.amount_field.to_owned(), amount));
+            r.push((c.amount_field.to_owned(), currency_to_string_without_delim(&amount)));
         },
     }
     r
+}
+
+// For some reason, the Currency type prepends a ',' to values in the hundreds, so just remove
+// all ',' from the string generated by Currency to avoid such silliness.
+fn currency_to_string_without_delim(c: &Currency) -> String {
+    let s = c.to_string();
+    s.replace(",", "")
 }
