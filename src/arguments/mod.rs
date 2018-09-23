@@ -1,5 +1,4 @@
 use argparse::{ArgumentParser, Store, StoreTrue, StoreFalse};
-use itertools::Itertools;
 use std::str::FromStr;
 use util;
 
@@ -169,19 +168,23 @@ impl Args {
     }
 }
 
-pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Arguments {
+pub fn parse_args() -> Arguments {
     let mut args = Args::new();
-    let src_options = format!("Source file format. One of [{}]", src_formats.iter().sorted().iter().join(", "));
-    let dst_options = format!("Destination format. One of [{}]", dst_formats.iter().sorted().iter().join(", "));
     {
         let mut ap = ArgumentParser::new();
-        ap.set_description("Transaction processor");
+        ap.set_description("Transaction processor. \
+        Command line arguments override any values that are also present in the config file.");
+
+        ap.refer(&mut args.config_file)
+            .add_option(&["--config-file"],
+                        Store,
+                        "Name of the config file.")
+            .required();
 
         ap.refer(&mut args.src_format)
             .add_option(&["-s", "--src-format"],
                         Store,
-                        &src_options)
-            .required();
+                        "Source data format.");
 
         ap.refer(&mut args.src_account)
             .add_option(&["-a", "--src-account"],
@@ -191,7 +194,7 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
         ap.refer(&mut args.dst_format)
             .add_option(&["-d", "--dst-format"],
                         Store,
-                        &dst_options)
+                        "Destination data format")
             .required();
 
         ap.refer(&mut args.src_file)
@@ -207,7 +210,7 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
         ap.refer(&mut args.sort_by)
             .add_option(&["--sort-by"],
                         Store,
-                        "What to sort the output by");
+                        "What to sort the output by.");
 
         ap.refer(&mut args.sort_order)
             .add_option(&["--sort-order"],
@@ -231,11 +234,6 @@ pub fn parse_args(src_formats: Vec<&String>, dst_formats: Vec<&String>) -> Argum
             .add_option(&["--skip-prompts"],
                         StoreTrue,
                         "Skip any prompts for optional user input.");
-
-        ap.refer(&mut args.config_file)
-            .add_option(&["--config-file"],
-                        Store,
-                        "Name of the config file.");
 
         ap.parse_args_or_exit();
     }

@@ -1,16 +1,16 @@
 use serde_json;
 use std::io;
-use parser::{deserialize_item_with_key, Key, default_false, default_true};
+use parser::{deserialize_keyed_items, Keyed, default_false, default_true};
 use std::collections::{HashMap};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    #[serde(rename = "accounts", deserialize_with = "deserialize_item_with_key")]
+    #[serde(rename = "accounts", deserialize_with = "deserialize_keyed_items")]
     pub accounts: HashMap<String, AccountConfig>,
-    #[serde(rename = "categories", deserialize_with = "deserialize_item_with_key")]
+    #[serde(rename = "categories", deserialize_with = "deserialize_keyed_items")]
     pub categories: HashMap<String, Category>,
-    #[serde(rename = "formats", deserialize_with = "deserialize_item_with_key")]
-    pub formats: HashMap<String, Format>,
+    #[serde(rename = "formats", deserialize_with = "deserialize_keyed_items")]
+    pub formats: HashMap<String, FormatConfig>,
     #[serde(rename = "ignorePending", default = "default_true")]
     pub ignore_pending: bool,
     #[serde(rename = "skipPrompts", default = "default_false")]
@@ -39,7 +39,7 @@ pub struct AccountConfig {
     pub format_id: String,
     #[serde(rename = "payeeNormalizers")]
     pub payee_normalizers: Vec<PayeeNormalizerConfig>,
-    #[serde(rename = "payees", deserialize_with = "deserialize_item_with_key")]
+    #[serde(rename = "payees", deserialize_with = "deserialize_keyed_items")]
     pub payees: HashMap<String, Payee>,
     #[serde(rename = "ignorePending", default = "default_true")]
     pub ignore_pending: bool,
@@ -47,7 +47,7 @@ pub struct AccountConfig {
     pub sort: Option<Sort>,
 }
 
-impl Key<String> for AccountConfig {
+impl Keyed<String> for AccountConfig {
     fn key(&self) -> String {
         self.id.to_owned()
     }
@@ -96,7 +96,7 @@ pub struct Payee {
     pub category_ids: Option<Vec<String>>,
 }
 
-impl Key<String> for Payee {
+impl Keyed<String> for Payee {
     fn key(&self) -> String {
         self.id.to_owned()
     }
@@ -110,23 +110,7 @@ pub struct Category {
     pub name: String,
 }
 
-impl Key<String> for Category {
-    fn key(&self) -> String {
-        self.id.to_owned()
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Format {
-    #[serde(rename = "id")]
-    pub id: String,
-    #[serde(rename = "name")]
-    pub name: String,
-    #[serde(rename = "includeHeader", default = "default_true")]
-    pub include_header: bool,
-}
-
-impl Key<String> for Format {
+impl Keyed<String> for Category {
     fn key(&self) -> String {
         self.id.to_owned()
     }
@@ -152,4 +136,130 @@ pub enum SortOrder {
     Ascending,
     #[serde(rename = "descending")]
     Descending,
+}
+
+// todo: should FormatConfig go in the 'formats' module?
+#[derive(Debug, Deserialize)]
+pub struct FormatConfig {
+    #[serde(rename = "id")]
+    pub id: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "includeHeader", default = "default_true")]
+    pub include_header: bool,
+    #[serde(rename = "dataFormat")]
+    pub data_format: DataFormat,
+    #[serde(rename = "fieldOrder")]
+    pub field_order: Vec<String>,
+    #[serde(rename = "dateTimeConfig")]
+    pub date_time_config: DateTimeConfig,
+    #[serde(rename = "payeeConfig")]
+    pub payee_config: PayeeConfig,
+    #[serde(rename = "amountConfig")]
+    pub amount_config: AmountConfig,
+    #[serde(rename = "statusConfig")]
+    pub status_config: Option<StatusConfig>,
+    #[serde(rename = "memoConfig")]
+    pub memo_config: Option<MemoConfig>,
+    #[serde(rename = "categoryConfig")]
+    pub category_config: Option<CategoryConfig>
+}
+
+impl Keyed<String> for FormatConfig {
+    fn key(&self) -> String {
+        self.id.to_owned()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub enum DataFormat {
+    #[serde(rename = "csv")]
+    Csv,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DateTimeConfig {
+    #[serde(rename = "dateField")]
+    pub date_field: String,
+    #[serde(rename = "dateFormat")]
+    pub date_format: String,
+    #[serde(rename = "timeField")]
+    pub time_field: Option<String>,
+    #[serde(rename = "timeFormat")]
+    pub time_format: Option<String>,
+    #[serde(rename = "dateTimeDeliminator")]
+    pub deliminator: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PayeeConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AmountConfig {
+    #[serde(rename = "format")]
+    pub format: AmountFormat,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum AmountFormat {
+    #[serde(rename = "SingleAmountField")]
+    SingleAmountField(SingleAmountFieldConfig), // todo: create a test file for this
+    #[serde(rename = "SeparateDebitCreditFields")]
+    SeparateDebitCreditFields(SeparateDebitCreditFieldsConfig),
+    #[serde(rename = "TransactionTypeAndAmountFields")]
+    TransactionTypeAndAmountFields(TransactionTypeAndAmountFieldsConfig),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SingleAmountFieldConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SeparateDebitCreditFieldsConfig {
+    #[serde(rename = "debitField")]
+    pub debit_field: String,
+    #[serde(rename = "creditField")]
+    pub credit_field: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TransactionTypeAndAmountFieldsConfig {
+    #[serde(rename = "amountField")]
+    pub amount_field: String,
+    #[serde(rename = "transactionTypeField")]
+    pub transaction_type_field: String,
+    #[serde(rename = "creditString")]
+    pub credit_string: String,
+    #[serde(rename = "debitString")]
+    pub debit_string: String,
+    #[serde(rename = "includeDebitSign", default = "default_false")]
+    pub include_debit_sign: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatusConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
+    #[serde(rename = "pendingString")]
+    pub pending_string: String,
+    #[serde(rename = "clearedString")]
+    pub cleared_string: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MemoConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CategoryConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
 }

@@ -26,7 +26,7 @@ pub fn get_files_ignore_ext(dir: &Path, ignore_extensions: &HashSet<String>) -> 
 }
 
 pub fn get_optional_string(s: String) -> Option<String> {
-    if s.len() != 0 {
+    if s.trim().len() != 0 {
         Option::Some(s)
     } else {
         Option::None
