@@ -2,29 +2,116 @@ use serde_json;
 use std::io;
 use parser::{deserialize_keyed_items, Keyed, default_false, default_true};
 use std::collections::{HashMap};
+use config::arguments::{Arguments};
+use util;
 
-#[derive(Debug, Deserialize)]
+mod arguments;
+
 pub struct Config {
-    #[serde(rename = "accounts", deserialize_with = "deserialize_keyed_items")]
-    pub accounts: HashMap<String, AccountConfig>,
-    #[serde(rename = "categories", deserialize_with = "deserialize_keyed_items")]
-    pub categories: HashMap<String, Category>,
-    #[serde(rename = "formats", deserialize_with = "deserialize_keyed_items")]
-    pub formats: HashMap<String, FormatConfig>,
-    #[serde(rename = "ignorePending", default = "default_true")]
-    pub ignore_pending: bool,
-    #[serde(rename = "skipPrompts", default = "default_false")]
-    pub skip_prompts: bool,
-    #[serde(rename = "sort")]
-    pub sort: Option<Sort>,
+    args: Arguments,
+    config_file: ConfigFile,
 }
 
 impl Config {
-    pub fn from_reader(r: Box<io::Read>) -> Result<Config, String> {
-        Self::verify(serde_json::from_reader(r).unwrap())
+    pub fn new_and_parse_args() -> Result<Config, String> {
+        let args = Arguments::parse_args();
+        let r = util::reader_from_file_name(&args.config_file)?;
+        let config_file = ConfigFile::from_reader(r)?;
+        Ok(Config {
+            args,
+            config_file,
+        })
     }
 
-    fn verify(c: Config) -> Result<Config, String> {
+    fn account_id(&self) -> &str {
+        &self.args.src_account
+    }
+
+    pub fn account(&self) -> Option<&AccountConfig> {
+        self.config_file.accounts.get(self.account_id())
+    }
+
+    fn dst_format_id(&self) -> &str {
+        &self.args.dst_format
+    }
+
+    pub fn dst_format(&self) -> Option<&FormatConfig> {
+        self.config_file.formats.get(self.dst_format_id())
+    }
+
+    pub fn src_file(&self) -> Option<&String> {
+        self.args.src_file.as_ref()
+    }
+
+    pub fn dst_file(&self) -> Option<&String> {
+        self.args.dst_file.as_ref()
+    }
+
+    pub fn category(&self, category_id: &str) -> Option<&Category> {
+        self.config_file.categories.get(category_id)
+    }
+
+    pub fn sort(&self) -> Option<Sort> {
+        self.args.sort.clone()
+            .or(self.account().and_then(|a| {
+                a.sort.clone()
+            }))
+            .or(self.config_file.sort.clone())
+    }
+
+    /// Whether to include the header in CSV output
+    pub fn include_header(&self) -> bool {
+        self.args.include_header
+            .or(self.dst_format().and_then(|f| {
+                f.include_header
+            }))
+            .unwrap_or(false)
+    }
+
+    pub fn ignore_pending(&self) -> bool {
+        self.args.ignore_pending
+            .or(self.account().and_then(|a| {
+                a.ignore_pending
+            }))
+            .or(self.config_file.ignore_pending)
+            .unwrap_or(true)
+    }
+
+    pub fn skip_prompts(&self) -> bool {
+        self.args.skip_prompts
+            .or(self.account().and_then(|a| {
+                a.skip_prompts
+            }))
+            .or(self.config_file.skip_prompts)
+            .unwrap_or(false)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfigFile {
+    #[serde(rename = "accounts", deserialize_with = "deserialize_keyed_items")]
+    accounts: HashMap<String, AccountConfig>,
+    #[serde(rename = "categories", deserialize_with = "deserialize_keyed_items")]
+    pub categories: HashMap<String, Category>,
+    #[serde(rename = "formats", deserialize_with = "deserialize_keyed_items")]
+    formats: HashMap<String, FormatConfig>,
+    #[serde(rename = "ignorePending")]
+    ignore_pending: Option<bool>,
+    #[serde(rename = "skipPrompts")]
+    skip_prompts: Option<bool>,
+    #[serde(rename = "sort")]
+    sort: Option<Sort>,
+}
+
+impl ConfigFile {
+    fn from_reader(r: Box<io::Read>) -> Result<ConfigFile, String> {
+        match serde_json::from_reader(r) {
+            Ok(c) => Self::verify(c),
+            Err(e) => Err(format!("Unable to read config file: {}", e)),
+        }
+    }
+
+    fn verify(c: ConfigFile) -> Result<ConfigFile, String> {
         Ok(c)
     }
 }
@@ -41,10 +128,12 @@ pub struct AccountConfig {
     pub payee_normalizers: Vec<PayeeNormalizerConfig>,
     #[serde(rename = "payees", deserialize_with = "deserialize_keyed_items")]
     pub payees: HashMap<String, Payee>,
-    #[serde(rename = "ignorePending", default = "default_true")]
-    pub ignore_pending: bool,
+    #[serde(rename = "ignorePending")]
+    ignore_pending: Option<bool>,
     #[serde(rename = "sort")]
-    pub sort: Option<Sort>,
+    sort: Option<Sort>,
+    #[serde(rename = "skipPrompts")]
+    skip_prompts: Option<bool>,
 }
 
 impl Keyed<String> for AccountConfig {
@@ -61,8 +150,6 @@ pub struct PayeeNormalizerConfig {
     pub payee_id: String,
     #[serde(rename = "ignoreCase", default = "default_true")]
     pub ignore_case: bool,
-    #[serde(rename = "skipPrompts", default = "default_false")]
-    pub skip_prompts: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -116,7 +203,7 @@ impl Keyed<String> for Category {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Sort {
     #[serde(rename = "sortBy")]
     pub sort_by: SortBy,
@@ -124,13 +211,13 @@ pub struct Sort {
     pub order: SortOrder,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub enum SortBy {
     #[serde(rename = "date")]
     Date,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub enum SortOrder {
     #[serde(rename = "ascending")]
     Ascending,
@@ -145,8 +232,8 @@ pub struct FormatConfig {
     pub id: String,
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "includeHeader", default = "default_true")]
-    pub include_header: bool,
+    #[serde(rename = "includeHeader")]
+    include_header: Option<bool>,
     #[serde(rename = "dataFormat")]
     pub data_format: DataFormat,
     #[serde(rename = "fieldOrder")]

@@ -1,5 +1,4 @@
 use transaction::Transaction;
-use arguments::Arguments;
 use config::{Config, MatcherType};
 use regex::RegexBuilder;
 
@@ -8,8 +7,8 @@ pub struct PayeeNormalizer {
 }
 
 impl PayeeNormalizer {
-    pub fn normalized_payee_id(config: &Config, account_id: &str, s: &str) -> Option<String> {
-        config.accounts.get(account_id).and_then(|x| {
+    pub fn normalized_payee_id(config: &Config, s: &str) -> Option<String> {
+        config.account().and_then(|x| {
             for n in &x.payee_normalizers {
                 match &n.normalizer_type {
                     MatcherType::Exact {exact_match_string} => {
@@ -50,11 +49,11 @@ impl PayeeNormalizer {
         }
     }
 
-    pub fn category_for_transaction(args: &Arguments, config: &Config, account_id: &str, transaction: &Transaction) -> Option<String> {
+    pub fn category_for_transaction(config: &Config, transaction: &Transaction) -> Option<String> {
         if let Option::None = transaction.normalized_payee_id {
             return Option::None;
         }
-        config.accounts.get(account_id).and_then(|a| {
+        config.account().and_then(|a| {
             transaction.normalized_payee_id.as_ref().and_then(|p| {
                 a.payees.get(p)
             })
@@ -67,18 +66,19 @@ impl PayeeNormalizer {
             if c.len() == 1 {
                 return c.first()
             }
-            return PayeeNormalizer::prompt_select_category_id(args, config, transaction, c)
+            if !config.skip_prompts() {
+                return PayeeNormalizer::prompt_select_category_id(config, transaction, c);
+            } else {
+                return Option::None;
+            }
         }).and_then(|x| {
-            config.categories.get(x)
+            config.category(x)
         }).and_then(|c| {
             Option::Some(c.name.to_owned())
         })
     }
 
-    fn prompt_select_category_id<'a>(args: &Arguments, config: &'a Config, transaction: &Transaction, category_ids: &'a Vec<String>) -> Option<&'a String> {
-        if args.skip_prompts || config.skip_prompts {
-            return Option::None
-        }
+    fn prompt_select_category_id<'a>(config: &'a Config, transaction: &Transaction, category_ids: &'a Vec<String>) -> Option<&'a String> {
         println!();
         println!("Multiple categories available for transaction: [payee: {}], [amount: {}], [date: {}]",
                  transaction.payee(), transaction.amount, transaction.date);
@@ -86,7 +86,7 @@ impl PayeeNormalizer {
 
         println!("{}. {}", 0, "(skip)");
         for (i, category_id) in category_ids.iter().enumerate() {
-            if let Option::Some(c) = config.categories.get(category_id) {
+            if let Option::Some(c) = config.category(category_id) {
                 println!("{}. {}", i + 1, c.name);
             }
         }

@@ -13,7 +13,6 @@ extern crate currency;
 extern crate num;
 
 pub mod transaction;
-pub mod arguments;
 pub mod config;
 pub mod parser;
 pub mod util;
