@@ -17,7 +17,7 @@ impl TransactionIO {
             },
             Option::None => Box::new(io::stdin()),
         };
-        config.dst_format().and_then(|f| {
+        config.src_format().and_then(|f| {
             let transactions = formats::import_from_configurable_format(r, f);
             let transactions = filter(config, transactions);
             let transactions = sort(config, transactions);
