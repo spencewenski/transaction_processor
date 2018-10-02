@@ -20,13 +20,14 @@ impl TransactionIO {
         config.src_format().and_then(|f| {
             let transactions = formats::import_from_configurable_format(r, f);
             let transactions = filter(config, transactions);
-            let transactions = sort(config, transactions);
             let transactions = normalize_and_categorize(config, transactions);
             Option::Some(transactions)
         }).unwrap_or(Vec::default())
     }
 
     pub fn export(config: &Config, transactions: Vec<Transaction>) {
+        // Sort transactions just before exporting
+        let transactions = sort(config, transactions);
         let w: Box<io::Write> = match config.dst_file() {
             Option::Some(f) => {
                 let f = File::create(f).expect("Unable to open file");
@@ -53,6 +54,14 @@ fn filter(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transactio
     transactions
 }
 
+fn normalize_and_categorize(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    transactions.iter_mut().for_each(|t| {
+        t.normalize_payee(config);
+        t.categorize(config);
+    });
+    transactions
+}
+
 fn sort(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
     if let Option::Some(ref sort) = config.sort() {
         transactions.sort_by(|a, b| {
@@ -63,13 +72,5 @@ fn sort(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction>
             }
         });
     }
-    transactions
-}
-
-fn normalize_and_categorize(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
-    transactions.iter_mut().for_each(|t| {
-        t.normalize_payee(config);
-        t.categorize(config);
-    });
     transactions
 }
