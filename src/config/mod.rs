@@ -6,6 +6,8 @@ use config::arguments::{Arguments};
 use util;
 use regex::RegexBuilder;
 use itertools::Itertools;
+use std::fmt;
+use std::fmt::Display;
 
 mod arguments;
 
@@ -161,6 +163,12 @@ pub struct AccountConfig {
     skip_prompts: Option<bool>,
 }
 
+impl Display for AccountConfig {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Account: (id: {}, name: {})", self.id, self.name)
+    }
+}
+
 impl Keyed<String> for AccountConfig {
     fn key(&self) -> String {
         self.id.to_owned()
@@ -236,6 +244,12 @@ pub struct Payee {
     pub category_ids: Option<Vec<String>>,
 }
 
+impl Display for Payee {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Payee: (id: {}, name: {})", self.id, self.name)
+    }
+}
+
 impl Keyed<String> for Payee {
     fn key(&self) -> String {
         self.id.to_owned()
@@ -264,6 +278,12 @@ pub struct Category {
     pub id: String,
     #[serde(rename = "name")]
     pub name: String,
+}
+
+impl Display for Category {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Category: (id: {}, name: {})", self.id, self.name)
+    }
 }
 
 impl Keyed<String> for Category {
@@ -319,6 +339,12 @@ pub struct FormatConfig {
     pub memo_config: Option<MemoConfig>,
     #[serde(rename = "categoryConfig")]
     pub category_config: Option<CategoryConfig>
+}
+
+impl Display for FormatConfig {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Format: (id: {}, name: {})", self.id, self.name)
+    }
 }
 
 impl Keyed<String> for FormatConfig {

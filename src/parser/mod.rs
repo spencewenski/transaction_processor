@@ -6,6 +6,7 @@ use csv;
 use csv::Writer;
 use serde;
 use serde::{Deserializer, Deserialize, de};
+use serde::de::{Error};
 
 pub fn parse_csv<T>() -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
     parse_csv_from_reader(Box::new(io::stdin()))
@@ -53,12 +54,18 @@ pub fn deserialize_from_str<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 }
 
 pub fn deserialize_keyed_items<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
-    where D: Deserializer<'de>, V: Keyed<K> + Deserialize<'de>, K: std::hash::Hash + std::cmp::Eq + ToOwned
+    where D: Deserializer<'de>,
+          V: Keyed<K> + Deserialize<'de> + std::fmt::Display,
+          K: std::hash::Hash + std::cmp::Eq + ToOwned + std::fmt::Display
 {
     let mut m : HashMap<K, V> = HashMap::new();
     let v : Vec<V> = Vec::deserialize(deserializer)?;
     for item in v {
-        m.insert(item.key(), item);
+        let key = item.key();
+        if m.contains_key(&key) {
+            return Err(D::Error::custom(format!("Duplicate key [{}] for item [{}]", key, item)));
+        }
+        m.insert(key, item);
     }
     Ok(m)
 }
