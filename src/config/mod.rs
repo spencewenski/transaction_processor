@@ -32,22 +32,26 @@ impl Config {
         &self.args.src_account
     }
 
-    pub fn account(&self) -> Option<&AccountConfig> {
+    pub fn account(&self) -> &AccountConfig {
+        // We validated the input, so this should never return Option::None
         self.config_file.accounts.get(self.account_id())
+            .expect(&format!("Account [{}] does not exist.", self.account_id()))
     }
 
-    pub fn src_format(&self) -> Option<&FormatConfig> {
-        self.account().and_then(|a| {
-            self.config_file.formats.get(&a.format_id)
-        })
+    pub fn src_format(&self) -> &FormatConfig {
+        // We validated the input, so this should never return Option::None
+        self.config_file.formats.get(&self.account().format_id)
+            .expect(&format!("Source format [{}] does not exist.", self.account().format_id))
     }
 
-    fn dst_format_id(&self) -> &str {
+    pub fn dst_format_id(&self) -> &str {
         &self.args.dst_format
     }
 
-    pub fn dst_format(&self) -> Option<&FormatConfig> {
+    pub fn dst_format(&self) -> &FormatConfig {
+        // We validated the input, so this should never return Option::None
         self.config_file.formats.get(self.dst_format_id())
+            .expect(&format!("Destination format [{}] does not exist.", self.dst_format_id()))
     }
 
     pub fn src_file(&self) -> Option<&String> {
@@ -64,35 +68,27 @@ impl Config {
 
     pub fn sort(&self) -> Option<Sort> {
         self.args.sort.clone()
-            .or(self.account().and_then(|a| {
-                a.sort.clone()
-            }))
+            .or(self.account().sort.clone())
             .or(self.config_file.sort.clone())
     }
 
     /// Whether to include the header in CSV output
     pub fn include_header(&self) -> bool {
         self.args.include_header
-            .or(self.dst_format().and_then(|f| {
-                f.include_header
-            }))
+            .or(self.dst_format().include_header)
             .unwrap_or(false)
     }
 
     pub fn ignore_pending(&self) -> bool {
         self.args.ignore_pending
-            .or(self.account().and_then(|a| {
-                a.ignore_pending
-            }))
+            .or(self.account().ignore_pending)
             .or(self.config_file.ignore_pending)
             .unwrap_or(true)
     }
 
     pub fn skip_prompts(&self) -> bool {
         self.args.skip_prompts
-            .or(self.account().and_then(|a| {
-                a.skip_prompts
-            }))
+            .or(self.account().skip_prompts)
             .or(self.config_file.skip_prompts)
             .unwrap_or(false)
     }
