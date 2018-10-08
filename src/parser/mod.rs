@@ -8,33 +8,39 @@ use serde;
 use serde::{Deserializer, Deserialize, de};
 use serde::de::{Error};
 
-pub fn parse_csv<T>() -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
+pub fn parse_csv<T>() -> Result<Vec<T>, String> where for<'de> T: serde::Deserialize<'de> {
     parse_csv_from_reader(Box::new(io::stdin()))
 }
 
-pub fn parse_csv_from_string<T>(s: &'static str) -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
+pub fn parse_csv_from_string<T>(s: &'static str) -> Result<Vec<T>, String> where for<'de> T: serde::Deserialize<'de> {
     parse_csv_from_reader(Box::new(s.as_bytes()))
 }
 
-pub fn parse_csv_from_reader<T>(r: Box<io::Read>) -> Vec<T> where for<'de> T: serde::Deserialize<'de> {
+pub fn parse_csv_from_reader<T>(r: Box<io::Read>) -> Result<Vec<T>, String> where for<'de> T: serde::Deserialize<'de> {
     let mut reader = csv::Reader::from_reader(r);
     let mut values = Vec::new();
     for result in reader.deserialize() {
-        let value: T = result.unwrap();
-        values.push(value);
+        match result {
+            Ok(value) => values.push(value),
+            Err(e) => return Err(format!("An error occurred while parsing input: {}", e)),
+        }
     }
-    values
+    Ok(values)
 }
 
-pub fn write_csv<T>(values: Vec<T>, has_headers: bool) where T: serde::Serialize {
+pub fn write_csv<T>(values: Vec<T>, has_headers: bool) -> Result<(), String> where T: serde::Serialize {
     write_csv_to_writer(values, has_headers, Box::new(io::stdout()))
 }
 
-pub fn write_csv_to_writer<T>(values: Vec<T>, has_headers: bool, writer: Box<io::Write>) where T: serde::Serialize {
+pub fn write_csv_to_writer<T>(values: Vec<T>, has_headers: bool, writer: Box<io::Write>) -> Result<(), String> where T: serde::Serialize {
     let mut writer = create_csv_writer(has_headers, writer);
     for value in values {
-        writer.serialize(value).unwrap();
+        let r = writer.serialize(value);
+        if let Err(e) = r {
+            return Err(format!("An error occurred while writing output: {}", e));
+        }
     }
+    Ok(())
 }
 
 pub fn create_csv_writer(has_headers: bool, writer: Box<io::Write>) -> Writer<Box<io::Write>> {

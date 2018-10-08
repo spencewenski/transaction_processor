@@ -7,43 +7,49 @@ use currency::{Currency};
 use num::{Signed};
 use std::ops::Neg;
 use config::Config;
+use util::{get_optional_string, currency_to_string_without_delim};
+use csv::Writer;
 
-pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Vec<Transaction> {
-    let unmapped_transactions : Vec<HashMap<String, String>> = parse_csv_from_reader(r);
+pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Result<Vec<Transaction>, String> {
+    let unmapped_transactions : Vec<HashMap<String, String>> = parse_csv_from_reader(r)?;
 
     let mut transactions = Vec::new();
-    unmapped_transactions.into_iter().for_each(|x| {
-        transactions.push(convert_to_transaction(x, f));
-    });
-    transactions
+    for unmapped in unmapped_transactions {
+        let t = convert_to_transaction(unmapped, f)?;
+        transactions.push(t);
+    }
+    Ok(transactions)
 }
 
-fn convert_to_transaction(unmapped: HashMap<String, String>, f: &FormatConfig) -> Transaction {
-    let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f);
-    let (date_time_string, date_time_format) = get_date_time_and_format(&unmapped, f);
+fn convert_to_transaction(unmapped: HashMap<String, String>, f: &FormatConfig) -> Result<Transaction, String> {
+    let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f)?;
+    let (date_time_string, date_time_format) = get_date_time_and_format(&unmapped, f)?;
     Transaction::build(date_time_string,
                        date_time_format,
-                       get_raw_payee_name(&unmapped, f),
+                       get_raw_payee_name(&unmapped, f)?,
                        get_category(&unmapped, f),
                        transaction_type,
                        amount,
-                       get_transaction_status(&unmapped, f),
+                       get_transaction_status(&unmapped, f)?,
                        get_memo(&unmapped, f))
 }
 
-fn get_raw_payee_name(unmapped: &HashMap<String, String>, f: &FormatConfig) -> String {
-    unmapped.get(&f.payee_config.field_name).and_then(|x| {
-        Option::Some(x.to_owned())
-    }).unwrap_or(Default::default())
+fn get_raw_payee_name(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Result<String, String> {
+    match unmapped.get(&f.payee_config.field_name) {
+        Option::Some(p) => Ok(p.to_owned()),
+        _ => Err(format!("Payee field [{}] does not exist.", f.payee_config.field_name)),
+    }
 }
 
 const DEFAULT_TIME: &'static str = "00:00:00";
 const DEFAULT_TIME_FORMAT: &'static str = "%T";
 const DEFAULT_DATE_TIME_DELIMINATOR: &'static str = " ";
 
-fn get_date_time_and_format(unmapped: &HashMap<String, String>, f: &FormatConfig) -> (String, String) {
-    let date = unmapped.get(&f.date_time_config.date_field)
-        .expect(&format!("No [{}] field available", f.date_time_config.date_field));
+fn get_date_time_and_format(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Result<(String, String), String> {
+    let date = match unmapped.get(&f.date_time_config.date_field) {
+        Option::Some(d) => Ok(d),
+        _ => Err(format!("Date field [{}] does not exist.", f.date_time_config.date_field)),
+    }?;
     let time = f.date_time_config.time_field.as_ref().and_then(|x| {
         unmapped.get(x)
     });
@@ -59,71 +65,94 @@ fn get_date_time_and_format(unmapped: &HashMap<String, String>, f: &FormatConfig
     let format = format!("{}{}{}", f.date_time_config.date_format, delim, time_format);
     let date_time_string = format!("{}{}{}", date, delim, time);
 
-    (date_time_string, format)
+    Ok((date_time_string, format))
 }
 
-fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &FormatConfig) -> (Currency, TransactionType) {
+fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Result<(Currency, TransactionType), String> {
     match f.amount_config.format {
         AmountFormat::SingleAmountField(ref c) => {
-            let amount = unmapped.get(&c.field_name).and_then(|x| {
-                Option::Some(get_currency_from_str(x))
-            }).unwrap_or(Default::default());
-
+            let amount = unmapped.get(&c.field_name).and_then(|a| {
+                get_currency_from_str(a)
+            });
+            let amount = match amount {
+                Option::Some(a) => a,
+                _ => Err(format!("Amount field [{}] does not exist.", &c.field_name)),
+            }?;
             let transaction_type = if amount.value().is_negative() {
                 TransactionType::Debit
             } else {
                 TransactionType::Credit
             };
 
-            (amount, transaction_type)
+            Ok((amount, transaction_type))
         },
         AmountFormat::SeparateDebitCreditFields(ref c) => {
             if let Option::Some(amount) = unmapped.get(&c.debit_field).and_then(|x| {
-                Option::Some(get_currency_from_str(x))
+                get_currency_from_str(x)
             }) {
-                return (amount, TransactionType::Debit);
+                return Ok((amount?, TransactionType::Debit));
             }
 
             if let Option::Some(amount) = unmapped.get(&c.credit_field).and_then(|x| {
-                Option::Some(get_currency_from_str(x))
+                get_currency_from_str(x)
             }) {
-                return (amount, TransactionType::Credit);
+                return Ok((amount?, TransactionType::Credit));
             }
 
-            panic!("No transaction amount detected");
+            Err(format!("Neither the debit field [{}] nor the credit field [{}] exists.", c.debit_field, c.credit_field))
         },
         AmountFormat::TransactionTypeAndAmountFields(ref c) => {
-            let amount = unmapped.get(&c.amount_field).and_then(|x| {
-                Option::Some(get_currency_from_str(x))
-            }).unwrap_or(Default::default());
-            let transaction_type = unmapped.get(&c.transaction_type_field).and_then(|x| {
-                if x == &c.credit_string {
-                    return Option::Some(TransactionType::Credit);
-                } else if x == &c.debit_string {
-                    return Option::Some(TransactionType::Debit);
-                }
-                Option::None
-            }).unwrap_or(TransactionType::Debit);
-            (amount, transaction_type)
+            let amount = unmapped.get(&c.amount_field).and_then(|a| {
+                get_currency_from_str(a)
+            });
+            let amount = match amount {
+                Option::Some(a) => a,
+                _ => Err(format!("Amount field [{}] does not exist.", c.amount_field)),
+            }?;
+            let transaction_type = match unmapped.get(&c.transaction_type_field) {
+                Option::Some(t) => {
+                    if t == &c.credit_string {
+                        Ok(TransactionType::Credit)
+                    } else if t == &c.debit_string {
+                        Ok(TransactionType::Debit)
+                    } else {
+                        Err(format!("String [{}] matches neither the credit string [{}] nor the debit string [{}]",
+                                    t, c.credit_string, c.debit_string))
+                    }
+                },
+                _ => Err(format!("Transaction type field [{}] does not exist.", c.transaction_type_field)),
+            }?;
+            Ok((amount, transaction_type))
         }
     }
 }
 
-fn get_currency_from_str(s: &str) -> Currency {
-    Currency::from_str(s).expect(&format!("Unable to parse amount into a valid currency: {}", s))
+fn get_currency_from_str(s: &str) -> Option<Result<Currency, String>> {
+    get_optional_string(s).and_then(|s| {
+        match Currency::from_str(&s) {
+            Ok(c) => Option::Some(Ok(c)),
+            Err(e) => Option::Some(Err(format!("Unable to parse amount [{}] into a valid currency: {}", s, e))),
+        }
+    })
 }
 
-fn get_transaction_status(unmapped: &HashMap<String, String>, f: &FormatConfig) -> TransactionStatus {
-    f.status_config.as_ref().and_then(|c| {
-        unmapped.get(&c.field_name).and_then(|x| {
-            if x == &c.cleared_string {
-                return Option::Some(TransactionStatus::Cleared);
-            } else if x == &c.pending_string {
-                return Option::Some(TransactionStatus::Pending);
-            }
-            Option::None
-        })
-    }).unwrap_or(TransactionStatus::Cleared)
+fn get_transaction_status(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Result<TransactionStatus, String> {
+    if let Option::Some(ref c) = f.status_config {
+        return match unmapped.get(&c.field_name) {
+            Option::Some(s) => {
+                if s == &c.cleared_string {
+                    Ok(TransactionStatus::Cleared)
+                } else if s == &c.pending_string {
+                    Ok(TransactionStatus::Pending)
+                } else {
+                    Err(format!("String [{}] matches neither the cleard string [{}] nor the pending string [{}]",
+                                s, c.cleared_string, c.pending_string))
+                }
+            },
+            _ => Err(format!("Transaction status field [{}] does not exist.", c.field_name)),
+        };
+    }
+    Ok(TransactionStatus::Cleared)
 }
 
 fn get_memo(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Option<String> {
@@ -143,14 +172,22 @@ fn get_category(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Option<
 }
 
 /// Assumes CSV
-pub fn export_to_configurable_format(w: Box<io::Write>, c: &Config, f: &FormatConfig, transactions: Vec<Transaction>) {
+pub fn export_to_configurable_format(w: Box<io::Write>, c: &Config, f: &FormatConfig, transactions: Vec<Transaction>) -> Result<(), String> {
     let mut w = create_csv_writer(c.include_header(), w);
     if c.include_header() {
-        w.write_record(&f.field_order).expect("Error writing record");
+        write_record(&mut w, &f.field_order)?;
     }
-    transactions.iter().for_each(|t| {
-        w.write_record(convert_to_configurable_format(f, t)).expect("Error writing record");
-    });
+    for t in &transactions {
+        write_record(&mut w, &convert_to_configurable_format(f, t))?;
+    }
+    Ok(())
+}
+
+fn write_record(w: &mut Writer<Box<io::Write>>, r: &Vec<String>) -> Result<(), String> {
+    if let Err(e) = w.write_record(r) {
+        return Err(format!("An error occurred while writing to the destination: {}", e));
+    }
+    Ok(())
 }
 
 fn convert_to_configurable_format(f: &FormatConfig, t: &Transaction) -> Vec<String> {
@@ -240,11 +277,4 @@ fn get_amount_fields(f: &FormatConfig, t: &Transaction) -> Vec<(String, String)>
         },
     }
     r
-}
-
-// For some reason, the Currency type prepends a ',' to values in the hundreds, so just remove
-// all ',' from the string generated by Currency to avoid such silliness.
-fn currency_to_string_without_delim(c: &Currency) -> String {
-    let s = c.to_string();
-    s.replace(",", "")
 }

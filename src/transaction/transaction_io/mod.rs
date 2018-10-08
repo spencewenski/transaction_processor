@@ -9,36 +9,36 @@ pub struct TransactionIO {
 }
 
 impl TransactionIO {
-    pub fn import(config: &Config) -> Vec<Transaction> {
+    pub fn import(config: &Config) -> Result<Vec<Transaction>, String> {
         let r: Box<io::Read> = match config.src_file() {
             Option::Some(f) => {
-                let f = File::open(f).expect("File not found");
+                let f = File::open(f).map_err(|e| {
+                    format!("An error occurred while trying to open file [{}]: {}", f, e)
+                })?;
                 Box::new(io::BufReader::new(f))
             },
             Option::None => Box::new(io::stdin()),
         };
-        config.src_format().and_then(|f| {
-            let transactions = formats::import_from_configurable_format(r, f);
-            let transactions = filter(config, transactions);
-            let transactions = normalize_and_categorize(config, transactions);
-            Option::Some(transactions)
-        }).unwrap_or(Vec::default())
+        let transactions = formats::import_from_configurable_format(r, config.src_format())?;
+        let transactions = filter(config, transactions);
+        let transactions = normalize_and_categorize(config, transactions);
+        Ok(transactions)
     }
 
-    pub fn export(config: &Config, transactions: Vec<Transaction>) {
+    pub fn export(config: &Config, transactions: Vec<Transaction>) -> Result<(), String> {
         // Sort transactions just before exporting
         let transactions = sort(config, transactions);
         let w: Box<io::Write> = match config.dst_file() {
             Option::Some(f) => {
-                let f = File::create(f).expect("Unable to open file");
+                let f = File::create(f).map_err(|e| {
+                    format!("An error occurred while trying to open file [{}]: {}", f, e)
+                })?;
                 Box::new(io::BufWriter::new(f))
             },
             Option::None => Box::new(io::stdout())
         };
-        config.dst_format().and_then(|f| {
-            formats::export_to_configurable_format(w, config, f, transactions);
-            Option::Some(())
-        });
+        formats::export_to_configurable_format(w, config, config.dst_format(), transactions)?;
+        Ok(())
     }
 }
 

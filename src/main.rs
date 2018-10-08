@@ -5,11 +5,8 @@ use transaction_processor::config::{Config};
 
 fn main() {
     let r = Config::new_and_parse_args().and_then(|c| {
-        let transactions = TransactionIO::import(&c);
-
-        TransactionIO::export(&c, transactions);
-
-        Ok(())
+        let transactions = TransactionIO::import(&c)?;
+        TransactionIO::export(&c, transactions)
     });
     if let Err(e) = r {
         println!();
