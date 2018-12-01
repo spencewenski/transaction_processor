@@ -83,7 +83,7 @@ impl Config {
         self.args.ignore_pending
             .or(self.account().ignore_pending)
             .or(self.config_file.ignore_pending)
-            .unwrap_or(true)
+            .unwrap_or(false)
     }
 
     pub fn skip_prompts(&self) -> bool {
