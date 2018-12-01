@@ -74,7 +74,10 @@ impl Arguments {
             ap.refer(&mut args.ignore_pending)
                 .add_option(&["--ignore-pending"],
                             StoreConst(Option::Some(true)),
-                            "Ignore pending transactions. Defaults to false");
+                            "Ignore pending transactions.")
+                .add_option(&["--include-pending"],
+                            StoreConst(Option::Some(false)),
+                            "Include pending transactions.");
 
             ap.refer(&mut args.skip_prompts)
                 .add_option(&["--skip-prompts"],
