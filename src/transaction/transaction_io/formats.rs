@@ -10,7 +10,7 @@ use config::Config;
 use util::{get_optional_string, currency_to_string_without_delim};
 use csv::Writer;
 
-pub fn import_from_configurable_format(r: Box<io::Read>, f: &FormatConfig) -> Result<Vec<Transaction>, String> {
+pub fn import_from_configurable_format(r: Box<dyn io::Read>, f: &FormatConfig) -> Result<Vec<Transaction>, String> {
     let unmapped_transactions : Vec<HashMap<String, String>> = parse_csv_from_reader(r)?;
 
     let mut transactions = Vec::new();
@@ -172,7 +172,7 @@ fn get_category(unmapped: &HashMap<String, String>, f: &FormatConfig) -> Option<
 }
 
 /// Assumes CSV
-pub fn export_to_configurable_format(w: Box<io::Write>, c: &Config, f: &FormatConfig, transactions: Vec<Transaction>) -> Result<(), String> {
+pub fn export_to_configurable_format(w: Box<dyn io::Write>, c: &Config, f: &FormatConfig, transactions: Vec<Transaction>) -> Result<(), String> {
     let mut w = create_csv_writer(c.include_header(), w);
     if c.include_header() {
         write_record(&mut w, &f.field_order)?;
@@ -183,7 +183,7 @@ pub fn export_to_configurable_format(w: Box<io::Write>, c: &Config, f: &FormatCo
     Ok(())
 }
 
-fn write_record(w: &mut Writer<Box<io::Write>>, r: &Vec<String>) -> Result<(), String> {
+fn write_record(w: &mut Writer<Box<dyn io::Write>>, r: &Vec<String>) -> Result<(), String> {
     if let Err(e) = w.write_record(r) {
         return Err(format!("An error occurred while writing to the destination: {}", e));
     }

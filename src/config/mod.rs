@@ -123,7 +123,7 @@ struct ConfigFile {
 }
 
 impl ConfigFile {
-    fn from_reader(r: Box<io::Read>) -> Result<ConfigFile, String> {
+    fn from_reader(r: Box<dyn io::Read>) -> Result<ConfigFile, String> {
         match serde_json::from_reader(r) {
             Ok(c) => Self::validate(c),
             Err(e) => Err(format!("Unable to read config file: {}", e)),

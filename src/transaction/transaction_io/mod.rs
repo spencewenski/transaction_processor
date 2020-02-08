@@ -10,7 +10,7 @@ pub struct TransactionIO {
 
 impl TransactionIO {
     pub fn import(config: &Config) -> Result<Vec<Transaction>, String> {
-        let r: Box<io::Read> = match config.src_file() {
+        let r: Box<dyn io::Read> = match config.src_file() {
             Option::Some(f) => {
                 let f = File::open(f).map_err(|e| {
                     format!("An error occurred while trying to open file [{}]: {}", f, e)
@@ -28,7 +28,7 @@ impl TransactionIO {
     pub fn export(config: &Config, transactions: Vec<Transaction>) -> Result<(), String> {
         // Sort transactions just before exporting
         let transactions = sort(config, transactions);
-        let w: Box<io::Write> = match config.dst_file() {
+        let w: Box<dyn io::Write> = match config.dst_file() {
             Option::Some(f) => {
                 let f = File::create(f).map_err(|e| {
                     format!("An error occurred while trying to open file [{}]: {}", f, e)
