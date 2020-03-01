@@ -123,8 +123,43 @@ fn get_amount_and_transaction_type(unmapped: &HashMap<String, String>, f: &Forma
                 _ => Err(format!("Transaction type field [{}] does not exist.", c.transaction_type_field)),
             }?;
             Ok((amount, transaction_type))
-        }
+        },
+        AmountFormat::Apple(ref _c) => {
+            let amount = unmapped.get("Amount (USD)").and_then(|a| {
+                get_currency_from_str(a)
+            });
+            let amount = match amount {
+                Option::Some(a) => a,
+                _ => Err(format!("Amount field does not exist."))
+            }?;
+
+            let transaction_type = match unmapped.get("Type") {
+                Option::Some(t) => t.to_string(),
+                _ => return Err(format!("Type field does not exist")),
+            };
+            let transaction_type = get_apple_transaction_type(&amount, &transaction_type)?;
+
+            return Ok((amount, transaction_type));
+        },
     }
+}
+
+fn get_apple_transaction_type(amount: &Currency, transaction_type: &str) -> Result<TransactionType, String> {
+    if transaction_type == "Purchase" && amount.value().is_negative() {
+        return Ok(TransactionType::Credit);
+    } else if transaction_type == "Purchase" && amount.value().is_positive() {
+        return Ok(TransactionType::Debit);
+    } else if transaction_type == "Payment" && amount.value().is_negative() {
+        return Ok(TransactionType::Debit);
+    } else if transaction_type == "Payment" && amount.value().is_positive() {
+        return Ok(TransactionType::Credit);
+    } else if transaction_type == "Debit" && amount.value().is_negative() {
+        return Ok(TransactionType::Credit);
+    } else if transaction_type == "Debit" && amount.value().is_positive() {
+        return Ok(TransactionType::Debit);
+    }
+    Err(format!("Unable to determine transaction type for amount [{}] and type string [{}]",
+                amount, transaction_type))
 }
 
 fn get_currency_from_str(s: &str) -> Option<Result<Currency, String>> {
@@ -274,6 +309,9 @@ fn get_amount_fields(f: &FormatConfig, t: &Transaction) -> Vec<(String, String)>
             };
             r.push((c.transaction_type_field.to_owned(), transaction_type));
             r.push((c.amount_field.to_owned(), currency_to_string_without_delim(&amount)));
+        },
+        AmountFormat::Apple(ref _c) => {
+
         },
     }
     r

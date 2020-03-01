@@ -73,8 +73,8 @@ impl Transaction {
     pub fn categorize(&mut self, config: &Config) {
         self.category = PayeeNormalizer::category_for_transaction(config, &self);
         if let Option::None = self.category {
-            println!("Transaction was not categorized: [payee: {}], [amount: {}], [date: {}]",
-                     self.payee(), currency_to_string_without_delim(&self.amount), self.date);
+            println!("Transaction was not categorized: [payee: {}], [amount: {}], [type: {:?}], [date: {}]",
+                     self.payee(), currency_to_string_without_delim(&self.amount), self.transaction_type, self.date);
         }
     }
 

@@ -454,6 +454,8 @@ fn validate_amount_config(f: &FormatConfig, a: &AmountConfig) -> Result<(), Stri
                                    c.transaction_type_field, f.id));
             }
         },
+        AmountFormat::Apple(ref _c) => {
+        },
     }
     Ok(())
 }
@@ -467,6 +469,8 @@ pub enum AmountFormat {
     SeparateDebitCreditFields(SeparateDebitCreditFieldsConfig),
     #[serde(rename = "TransactionTypeAndAmountFields")]
     TransactionTypeAndAmountFields(TransactionTypeAndAmountFieldsConfig),
+    #[serde(rename = "Apple")]
+    Apple(AppleConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -495,6 +499,11 @@ pub struct TransactionTypeAndAmountFieldsConfig {
     pub debit_string: String,
     #[serde(rename = "includeDebitSign", default = "default_false")]
     pub include_debit_sign: bool,
+}
+
+// Todo: Make this generic?
+#[derive(Debug, Deserialize)]
+pub struct AppleConfig {
 }
 
 #[derive(Debug, Deserialize)]
