@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use clap::Parser;
 use config::arguments::Arguments;
 use parser::{default_false, default_true, deserialize_keyed_items, Keyed};
 use regex::RegexBuilder;
@@ -6,6 +7,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
+use std::path::PathBuf;
 use util;
 
 mod arguments;
@@ -20,12 +22,11 @@ pub struct Config {
 
 impl Config {
     pub fn new_and_parse_args() -> anyhow::Result<Config> {
-        let args = Arguments::parse_args();
-        let account_config_file = AccountConfigFile::from_filename(&args.account_config_file)?;
-        let categories_config_file =
-            CategoriesConfigFile::from_filename(&args.categories_config_file)?;
-        let src_format_config_file = FormatConfigFile::from_filename(&args.src_format_config_file)?;
-        let dst_format_config_file = FormatConfigFile::from_filename(&args.dst_format_config_file)?;
+        let args: Arguments = Arguments::parse();
+        let account_config_file = AccountConfigFile::from_file(&args.account_config_file)?;
+        let categories_config_file = CategoriesConfigFile::from_file(&args.categories_config_file)?;
+        let src_format_config_file = FormatConfigFile::from_file(&args.src_format_config_file)?;
+        let dst_format_config_file = FormatConfigFile::from_file(&args.dst_format_config_file)?;
 
         let config = Config {
             args,
@@ -55,11 +56,11 @@ impl Config {
         &self.dst_format_config_file
     }
 
-    pub fn src_file(&self) -> Option<&String> {
+    pub fn src_file(&self) -> Option<&PathBuf> {
         self.args.src_file.as_ref()
     }
 
-    pub fn dst_file(&self) -> Option<&String> {
+    pub fn dst_file(&self) -> Option<&PathBuf> {
         self.args.dst_file.as_ref()
     }
 
@@ -67,8 +68,16 @@ impl Config {
         self.categories_config_file.categories.get(category_id)
     }
 
-    pub fn sort(&self) -> Option<Sort> {
-        self.args.sort.clone().or(self.account().sort.clone())
+    pub fn sort_order(&self) -> Option<SortOrder> {
+        if self.args.sort_order.is_some() {
+            return self.args.sort_order.clone();
+        }
+
+        self.dst_format()
+            .sort
+            .as_ref()
+            .map(|sort| sort.order.clone())
+            .or(Some(SortOrder::Ascending))
     }
 
     /// Whether to include the header in CSV output
@@ -110,7 +119,7 @@ struct CategoriesConfigFile {
 }
 
 impl CategoriesConfigFile {
-    fn from_filename(filename: &str) -> anyhow::Result<CategoriesConfigFile> {
+    fn from_file(filename: &PathBuf) -> anyhow::Result<CategoriesConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: CategoriesConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)
@@ -127,8 +136,6 @@ pub struct AccountConfigFile {
     pub format_id: String,
     #[serde(rename = "ignorePending")]
     ignore_pending: Option<bool>,
-    #[serde(rename = "sort")]
-    sort: Option<Sort>,
     #[serde(rename = "skipPrompts")]
     skip_prompts: Option<bool>,
     #[serde(rename = "payees", deserialize_with = "deserialize_keyed_items")]
@@ -136,7 +143,7 @@ pub struct AccountConfigFile {
 }
 
 impl AccountConfigFile {
-    fn from_filename(filename: &str) -> anyhow::Result<AccountConfigFile> {
+    fn from_file(filename: &PathBuf) -> anyhow::Result<AccountConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: AccountConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)
@@ -160,7 +167,7 @@ fn validate_account_config(config: &Config) -> anyhow::Result<()> {
         Err(anyhow!("Format ID [{}] for account [{}] is different from the ID of the provided source format file [{}].",
             config.account_config_file.format_id,
             config.account_config_file.name,
-            config.args.src_format_config_file))
+            config.args.src_format_config_file.to_str().unwrap_or("Invalid file name")))
     } else {
         Ok(())
     }
@@ -282,13 +289,13 @@ pub struct Sort {
     pub order: SortOrder,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, PartialEq, Clone, clap::ArgEnum)]
 pub enum SortBy {
     #[serde(rename = "date")]
     Date,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, PartialEq, Clone, clap::ArgEnum)]
 pub enum SortOrder {
     #[serde(rename = "ascending")]
     Ascending,
@@ -305,6 +312,8 @@ pub struct FormatConfigFile {
     pub name: String,
     #[serde(rename = "includeHeader")]
     include_header: Option<bool>,
+    #[serde(rename = "sort")]
+    sort: Option<Sort>,
     #[serde(rename = "dataFormat")]
     pub data_format: DataFormat,
     #[serde(rename = "fieldOrder")]
@@ -324,7 +333,7 @@ pub struct FormatConfigFile {
 }
 
 impl FormatConfigFile {
-    fn from_filename(filename: &str) -> anyhow::Result<FormatConfigFile> {
+    fn from_file(filename: &PathBuf) -> anyhow::Result<FormatConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: FormatConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)

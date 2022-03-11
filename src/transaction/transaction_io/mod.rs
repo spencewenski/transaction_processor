@@ -13,7 +13,11 @@ impl TransactionIO {
         let r: Box<dyn io::Read> = match config.src_file() {
             Option::Some(f) => {
                 let f = File::open(f).map_err(|e| {
-                    anyhow!("An error occurred while trying to open file [{}]: {}", f, e)
+                    anyhow!(
+                        "An error occurred while trying to open file [{}]: {}",
+                        f.to_str().unwrap_or("Invalid file name"),
+                        e
+                    )
                 })?;
                 Box::new(io::BufReader::new(f))
             }
@@ -31,7 +35,11 @@ impl TransactionIO {
         let w: Box<dyn io::Write> = match config.dst_file() {
             Option::Some(f) => {
                 let f = File::create(f).map_err(|e| {
-                    anyhow!("An error occurred while trying to open file [{}]: {}", f, e)
+                    anyhow!(
+                        "An error occurred while trying to open file [{}]: {}",
+                        f.to_str().unwrap_or("Invalid file name"),
+                        e
+                    )
                 })?;
                 Box::new(io::BufWriter::new(f))
             }
@@ -64,9 +72,9 @@ fn normalize_and_categorize(
 }
 
 fn sort(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
-    if let Option::Some(ref sort) = config.sort() {
+    if let Option::Some(ref sort_order) = config.sort_order() {
         transactions.sort_by(|a, b| {
-            if SortOrder::Ascending == sort.order {
+            if SortOrder::Ascending == *sort_order {
                 a.date().cmp(&b.date())
             } else {
                 a.date().cmp(&b.date()).reverse()

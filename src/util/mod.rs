@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use currency::Currency;
 use std::fs::File;
 use std::io;
+use std::path::PathBuf;
 
 pub fn get_optional_string(s: &str) -> Option<String> {
     if s.trim().len() > 0 {
@@ -11,10 +12,14 @@ pub fn get_optional_string(s: &str) -> Option<String> {
     }
 }
 
-pub fn reader_from_file_name(filename: &str) -> anyhow::Result<Box<dyn io::Read>> {
+pub fn reader_from_file_name(filename: &PathBuf) -> anyhow::Result<Box<dyn io::Read>> {
     match File::open(filename) {
         Ok(f) => Ok(Box::new(io::BufReader::new(f))),
-        Err(e) => Err(anyhow!("Unable to open file [{}]: {}", filename, e)),
+        Err(e) => Err(anyhow!(
+            "Unable to open file [{}]: {}",
+            filename.to_str().unwrap_or("Invalid file name"),
+            e
+        )),
     }
 }
 
