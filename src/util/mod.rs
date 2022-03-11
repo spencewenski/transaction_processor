@@ -24,3 +24,35 @@ pub fn currency_to_string_without_delim(c: &Currency) -> String {
     let s = c.to_string();
     s.replace(",", "")
 }
+
+#[cfg(test)]
+mod test {
+    use currency::Currency;
+    use util::{currency_to_string_without_delim, get_optional_string};
+
+    #[test]
+    fn test_currency_to_string_without_delim() {
+        let c = Currency::from_str("1,000,000").unwrap();
+        let s = currency_to_string_without_delim(&c);
+        assert_eq!(s, "1000000.00");
+
+        let c = Currency::from_str("10").unwrap();
+        let s = currency_to_string_without_delim(&c);
+        assert_eq!(s, "10.00");
+    }
+
+    #[test]
+    fn test_get_optional_string() {
+        let s = "";
+        let o = get_optional_string(s);
+        assert_eq!(o, Option::None);
+
+        let s = "   ";
+        let o = get_optional_string(s);
+        assert_eq!(o, Option::None);
+
+        let s = "\tfoo ";
+        let o = get_optional_string(s);
+        assert_eq!(o, Option::Some(String::from("\tfoo ")))
+    }
+}
