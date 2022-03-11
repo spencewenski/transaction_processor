@@ -1,5 +1,4 @@
 # Transaction Processor
-<a href="https://gitlab.com/spencewenski/transaction_processor/commits/master"><img alt="pipeline status" src="https://gitlab.com/spencewenski/transaction_processor/badges/master/pipeline.svg" /></a>
 
 This a Rust CLI program to transform transaction records of various financial
 accounts to different formats. This is intended to help with importing bank and
