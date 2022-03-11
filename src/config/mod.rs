@@ -1,57 +1,58 @@
-use serde_json;
-use std::io;
-use parser::{deserialize_keyed_items, Keyed, default_false, default_true};
-use std::collections::{HashMap};
-use config::arguments::{Arguments};
-use util;
+use anyhow::anyhow;
+use config::arguments::Arguments;
+use parser::{default_false, default_true, deserialize_keyed_items, Keyed};
 use regex::RegexBuilder;
-use itertools::Itertools;
+use serde_json;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
+use util;
 
 mod arguments;
 
 pub struct Config {
     args: Arguments,
-    config_file: ConfigFile,
+    account_config_file: AccountConfigFile,
+    categories_config_file: CategoriesConfigFile,
+    src_format_config_file: FormatConfigFile,
+    dst_format_config_file: FormatConfigFile,
 }
 
 impl Config {
-    pub fn new_and_parse_args() -> Result<Config, String> {
+    pub fn new_and_parse_args() -> anyhow::Result<Config> {
         let args = Arguments::parse_args();
-        let r = util::reader_from_file_name(&args.config_file)?;
-        let config_file = ConfigFile::from_reader(r)?;
-        validate_args(&args, &config_file)?;
-        Ok(Config {
+        let account_config_file = AccountConfigFile::from_filename(&args.account_config_file)?;
+        let categories_config_file =
+            CategoriesConfigFile::from_filename(&args.categories_config_file)?;
+        let src_format_config_file = FormatConfigFile::from_filename(&args.src_format_config_file)?;
+        let dst_format_config_file = FormatConfigFile::from_filename(&args.dst_format_config_file)?;
+
+        let config = Config {
             args,
-            config_file,
-        })
+            account_config_file,
+            categories_config_file,
+            src_format_config_file,
+            dst_format_config_file,
+        };
+
+        validate_configs(&config)?;
+
+        Ok(config)
     }
 
-    fn account_id(&self) -> &str {
-        &self.args.src_account
-    }
-
-    pub fn account(&self) -> &AccountConfig {
+    pub fn account(&self) -> &AccountConfigFile {
         // We validated the input, so this should never return Option::None
-        self.config_file.accounts.get(self.account_id())
-            .expect(&format!("Account [{}] does not exist.", self.account_id()))
+        &self.account_config_file
     }
 
-    pub fn src_format(&self) -> &FormatConfig {
+    pub fn src_format(&self) -> &FormatConfigFile {
         // We validated the input, so this should never return Option::None
-        self.config_file.formats.get(&self.account().format_id)
-            .expect(&format!("Source format [{}] does not exist.", self.account().format_id))
+        &self.src_format_config_file
     }
 
-    pub fn dst_format_id(&self) -> &str {
-        &self.args.dst_format
-    }
-
-    pub fn dst_format(&self) -> &FormatConfig {
+    pub fn dst_format(&self) -> &FormatConfigFile {
         // We validated the input, so this should never return Option::None
-        self.config_file.formats.get(self.dst_format_id())
-            .expect(&format!("Destination format [{}] does not exist.", self.dst_format_id()))
+        &self.dst_format_config_file
     }
 
     pub fn src_file(&self) -> Option<&String> {
@@ -63,146 +64,128 @@ impl Config {
     }
 
     pub fn category(&self, category_id: &str) -> Option<&Category> {
-        self.config_file.categories.get(category_id)
+        self.categories_config_file.categories.get(category_id)
     }
 
     pub fn sort(&self) -> Option<Sort> {
-        self.args.sort.clone()
-            .or(self.account().sort.clone())
-            .or(self.config_file.sort.clone())
+        self.args.sort.clone().or(self.account().sort.clone())
     }
 
     /// Whether to include the header in CSV output
     pub fn include_header(&self) -> bool {
-        self.args.include_header
+        self.args
+            .include_header
             .or(self.dst_format().include_header)
             .unwrap_or(false)
     }
 
     pub fn ignore_pending(&self) -> bool {
-        self.args.ignore_pending
+        self.args
+            .ignore_pending
             .or(self.account().ignore_pending)
-            .or(self.config_file.ignore_pending)
             .unwrap_or(false)
     }
 
     pub fn skip_prompts(&self) -> bool {
-        self.args.skip_prompts
+        self.args
+            .skip_prompts
             .or(self.account().skip_prompts)
-            .or(self.config_file.skip_prompts)
             .unwrap_or(false)
     }
 }
 
-fn validate_args(args: &Arguments, c: &ConfigFile) -> Result<(), String> {
-    if !c.accounts.contains_key(&args.src_account) {
-        return Err(format!("Source account id [{}] specified on command line does not exist in config file. Available options are [{}].",
-                           args.src_account, c.accounts.iter().map(|(_, a)| &a.id).sorted().iter().join(", ")));
-    }
-    if !c.formats.contains_key(&args.dst_format) {
-        return Err(format!("Destination format id [{}] specified on command line does not exist in config file. Available options are [{}].",
-                           args.dst_format, c.formats.iter().map(|(_, f)| &f.id).sorted().iter().join(", ")));
-    }
+fn validate_configs(config: &Config) -> anyhow::Result<()> {
+    validate_account_config(config)?;
+    validate_payee_normalizer_configs(config)?;
+    validate_payees(config)?;
+    validate_format(&config.src_format_config_file)?;
+    validate_format(&config.dst_format_config_file)?;
     Ok(())
 }
 
 #[derive(Debug, Deserialize)]
-struct ConfigFile {
-    #[serde(rename = "accounts", deserialize_with = "deserialize_keyed_items")]
-    accounts: HashMap<String, AccountConfig>,
+struct CategoriesConfigFile {
     #[serde(rename = "categories", deserialize_with = "deserialize_keyed_items")]
     pub categories: HashMap<String, Category>,
-    #[serde(rename = "formats", deserialize_with = "deserialize_keyed_items")]
-    formats: HashMap<String, FormatConfig>,
-    #[serde(rename = "ignorePending")]
-    ignore_pending: Option<bool>,
-    #[serde(rename = "skipPrompts")]
-    skip_prompts: Option<bool>,
-    #[serde(rename = "sort")]
-    sort: Option<Sort>,
 }
 
-impl ConfigFile {
-    fn from_reader(r: Box<dyn io::Read>) -> Result<ConfigFile, String> {
-        match serde_json::from_reader(r) {
-            Ok(c) => Self::validate(c),
-            Err(e) => Err(format!("Unable to read config file: {}", e)),
-        }
-    }
-
-    fn validate(c: ConfigFile) -> Result<ConfigFile, String> {
-        validate_accounts(&c)?;
-        validate_payee_normalizer_configs(&c)?;
-        validate_payees(&c)?;
-        validate_formats(&c)?;
-        Ok(c)
+impl CategoriesConfigFile {
+    fn from_filename(filename: &str) -> anyhow::Result<CategoriesConfigFile> {
+        let r = util::reader_from_file_name(filename)?;
+        let config_file: CategoriesConfigFile = serde_json::from_reader(r)?;
+        Ok(config_file)
     }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AccountConfig {
+pub struct AccountConfigFile {
     #[serde(rename = "id")]
     pub id: String,
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "formatId")]
     pub format_id: String,
-    #[serde(rename = "payeeNormalizers")]
-    pub payee_normalizers: Vec<PayeeNormalizerConfig>,
-    #[serde(rename = "payees", deserialize_with = "deserialize_keyed_items")]
-    pub payees: HashMap<String, Payee>,
     #[serde(rename = "ignorePending")]
     ignore_pending: Option<bool>,
     #[serde(rename = "sort")]
     sort: Option<Sort>,
     #[serde(rename = "skipPrompts")]
     skip_prompts: Option<bool>,
+    #[serde(rename = "payees", deserialize_with = "deserialize_keyed_items")]
+    pub payees: HashMap<String, Payee>,
 }
 
-impl Display for AccountConfig {
+impl AccountConfigFile {
+    fn from_filename(filename: &str) -> anyhow::Result<AccountConfigFile> {
+        let r = util::reader_from_file_name(filename)?;
+        let config_file: AccountConfigFile = serde_json::from_reader(r)?;
+        Ok(config_file)
+    }
+}
+
+impl Display for AccountConfigFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Account: (id: {}, name: {})", self.id, self.name)
     }
 }
 
-impl Keyed<String> for AccountConfig {
+impl Keyed<String> for AccountConfigFile {
     fn key(&self) -> String {
         self.id.to_owned()
     }
 }
 
-fn validate_accounts(c: &ConfigFile) -> Result<(), String> {
-    for (a_id, a) in &c.accounts {
-        if let Option::None = c.formats.get(&a.format_id) {
-            return Err(format!("Format with id [{}] does not exist. The id is referenced from account with id [{}]",
-                               a.format_id, a_id));
-        }
+fn validate_account_config(config: &Config) -> anyhow::Result<()> {
+    if config.account_config_file.format_id != config.src_format_config_file.id {
+        Err(anyhow!("Format ID [{}] for account [{}] is different from the ID of the provided source format file [{}].",
+            config.account_config_file.format_id,
+            config.account_config_file.name,
+            config.args.src_format_config_file))
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PayeeNormalizerConfig {
     #[serde(rename = "matcher")]
+    #[serde(flatten)]
     pub normalizer_type: MatcherType,
-    #[serde(rename = "payeeId")]
-    pub payee_id: String,
     #[serde(rename = "ignoreCase", default = "default_true")]
     pub ignore_case: bool,
 }
 
-fn validate_payee_normalizer_configs(c: &ConfigFile) -> Result<(), String> {
-    for (a_id, a) in &c.accounts {
-        for n in &a.payee_normalizers {
-            if let MatcherType::Regex {ref regex_string} = n.normalizer_type {
+fn validate_payee_normalizer_configs(config: &Config) -> anyhow::Result<()> {
+    for (p_id, payee) in &config.account_config_file.payees {
+        for normalizer in &payee.normalizers {
+            if let MatcherType::Regex { ref regex_string } = normalizer.normalizer_type {
                 if let Err(e) = RegexBuilder::new(regex_string).build() {
-                    return Err(format!("Invalid regex string provided to normalizer for payee [{}] in account [{}]: {}",
-                                       n.payee_id, a_id, e));
+                    return Err(anyhow!(
+                        "Invalid regex string provided to normalizer for payee [{}]: {}",
+                        p_id,
+                        e
+                    ));
                 }
-            }
-            if let Option::None = a.payees.get(&n.payee_id) {
-                return Err(format!("Invalid payee id [{}] used in a payee normalizer in account [{}]",
-                                   n.payee_id, a_id));
             }
         }
     }
@@ -238,6 +221,8 @@ pub struct Payee {
     pub name: String,
     #[serde(rename = "categoryIds")]
     pub category_ids: Option<Vec<String>>,
+    #[serde(rename = "normalizers")]
+    pub normalizers: Vec<PayeeNormalizerConfig>,
 }
 
 impl Display for Payee {
@@ -252,15 +237,16 @@ impl Keyed<String> for Payee {
     }
 }
 
-fn validate_payees(c: &ConfigFile) -> Result<(), String> {
-    for (a_id, a) in &c.accounts {
-        for (p_id, p) in &a.payees {
-            if let Option::Some(ref category_ids) = p.category_ids {
-                for c_id in category_ids {
-                    if let Option::None = c.categories.get(c_id) {
-                        return Err(format!("Category [{}] does not exist. Referenced from payee [{}] in account [{}].",
-                                           c_id, p_id, a_id));
-                    }
+fn validate_payees(config: &Config) -> anyhow::Result<()> {
+    for (p_id, p) in &config.account_config_file.payees {
+        if let Option::Some(ref category_ids) = p.category_ids {
+            for c_id in category_ids {
+                if let Option::None = config.categories_config_file.categories.get(c_id) {
+                    return Err(anyhow!(
+                        "Category [{}] does not exist. Referenced from payee [{}].",
+                        c_id,
+                        p_id
+                    ));
                 }
             }
         }
@@ -312,7 +298,7 @@ pub enum SortOrder {
 
 // todo: should FormatConfig go in the 'formats' module?
 #[derive(Debug, Deserialize)]
-pub struct FormatConfig {
+pub struct FormatConfigFile {
     #[serde(rename = "id")]
     pub id: String,
     #[serde(rename = "name")]
@@ -334,47 +320,74 @@ pub struct FormatConfig {
     #[serde(rename = "memoConfig")]
     pub memo_config: Option<MemoConfig>,
     #[serde(rename = "categoryConfig")]
-    pub category_config: Option<CategoryConfig>
+    pub category_config: Option<CategoryConfig>,
 }
 
-impl Display for FormatConfig {
+impl FormatConfigFile {
+    fn from_filename(filename: &str) -> anyhow::Result<FormatConfigFile> {
+        let r = util::reader_from_file_name(filename)?;
+        let config_file: FormatConfigFile = serde_json::from_reader(r)?;
+        Ok(config_file)
+    }
+}
+
+impl Display for FormatConfigFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Format: (id: {}, name: {})", self.id, self.name)
     }
 }
 
-impl Keyed<String> for FormatConfig {
+impl Keyed<String> for FormatConfigFile {
     fn key(&self) -> String {
         self.id.to_owned()
     }
 }
 
-fn validate_formats(c: &ConfigFile) -> Result<(), String> {
-    for (f_id, f) in &c.formats {
-        validate_date_time_config(f, &f.date_time_config)?;
-        validate_amount_config(f, &f.amount_config)?;
+fn validate_format(format_config: &FormatConfigFile) -> anyhow::Result<()> {
+    validate_date_time_config(format_config, &format_config.date_time_config)?;
+    validate_amount_config(format_config, &format_config.amount_config)?;
 
-        if !f.field_order.contains(&f.payee_config.field_name) {
-            return Err(format!("Payee field name [{}] for format [{}] not included in field order.",
-                               f.payee_config.field_name, f_id));
+    if !format_config
+        .field_order
+        .contains(&format_config.payee_config.field_name)
+    {
+        return Err(anyhow!(
+            "Payee field name [{}] for format [{}] not included in field order.",
+            format_config.payee_config.field_name,
+            format_config.id
+        ));
+    }
+    if let Option::Some(ref status_config) = format_config.status_config {
+        if !format_config
+            .field_order
+            .contains(&status_config.field_name)
+        {
+            return Err(anyhow!(
+                "Status field name [{}] for format [{}] not included in field order.",
+                status_config.field_name,
+                format_config.id
+            ));
         }
-        if let Option::Some(ref status_config) = f.status_config {
-            if !f.field_order.contains(&status_config.field_name) {
-                return Err(format!("Status field name [{}] for format [{}] not included in field order.",
-                                   status_config.field_name, f_id));
-            }
+    }
+    if let Option::Some(ref memo_config) = format_config.memo_config {
+        if !format_config.field_order.contains(&memo_config.field_name) {
+            return Err(anyhow!(
+                "Status field name [{}] for format [{}] not included in field order.",
+                memo_config.field_name,
+                format_config.id
+            ));
         }
-        if let Option::Some(ref memo_config) = f.memo_config {
-            if !f.field_order.contains(&memo_config.field_name) {
-                return Err(format!("Status field name [{}] for format [{}] not included in field order.",
-                                   memo_config.field_name, f_id));
-            }
-        }
-        if let Option::Some(ref category_config) = f.category_config {
-            if !f.field_order.contains(&category_config.field_name) {
-                return Err(format!("Status field name [{}] for format [{}] not included in field order.",
-                                   category_config.field_name, f_id));
-            }
+    }
+    if let Option::Some(ref category_config) = format_config.category_config {
+        if !format_config
+            .field_order
+            .contains(&category_config.field_name)
+        {
+            return Err(anyhow!(
+                "Status field name [{}] for format [{}] not included in field order.",
+                category_config.field_name,
+                format_config.id
+            ));
         }
     }
     Ok(())
@@ -400,15 +413,21 @@ pub struct DateTimeConfig {
     pub deliminator: Option<String>,
 }
 
-fn validate_date_time_config(f: &FormatConfig, d: &DateTimeConfig) -> Result<(), String> {
+fn validate_date_time_config(f: &FormatConfigFile, d: &DateTimeConfig) -> anyhow::Result<()> {
     if !f.field_order.contains(&d.date_field) {
-        return Err(format!("Date field name [{}] for format [{}] not included in field order.",
-                           d.date_field, f.id));
+        return Err(anyhow!(
+            "Date field name [{}] for format [{}] not included in field order.",
+            d.date_field,
+            f.id
+        ));
     }
     if let Option::Some(ref time_field) = d.time_field {
         if !f.field_order.contains(time_field) {
-            return Err(format!("Time field name [{}] for format [{}] not included in field order.",
-                               time_field, f.id));
+            return Err(anyhow!(
+                "Time field name [{}] for format [{}] not included in field order.",
+                time_field,
+                f.id
+            ));
         }
     }
     Ok(())
@@ -426,34 +445,49 @@ pub struct AmountConfig {
     pub format: AmountFormat,
 }
 
-fn validate_amount_config(f: &FormatConfig, a: &AmountConfig) -> Result<(), String> {
+fn validate_amount_config(f: &FormatConfigFile, a: &AmountConfig) -> anyhow::Result<()> {
     match a.format {
         AmountFormat::SingleAmountField(ref c) => {
             if !f.field_order.contains(&c.field_name) {
-                return Err(format!("Amount field name [{}] for format [{}] not included in field order.",
-                                   c.field_name, f.id));
+                return Err(anyhow!(
+                    "Amount field name [{}] for format [{}] not included in field order.",
+                    c.field_name,
+                    f.id
+                ));
             }
-        },
+        }
         AmountFormat::SeparateDebitCreditFields(ref c) => {
             if !f.field_order.contains(&c.debit_field) {
-                return Err(format!("Debit field name [{}] for format [{}] not included in field order.",
-                                   c.debit_field, f.id));
+                return Err(anyhow!(
+                    "Debit field name [{}] for format [{}] not included in field order.",
+                    c.debit_field,
+                    f.id
+                ));
             }
             if !f.field_order.contains(&c.credit_field) {
-                return Err(format!("Credit field name [{}] for format [{}] not included in field order.",
-                                   c.credit_field, f.id));
+                return Err(anyhow!(
+                    "Credit field name [{}] for format [{}] not included in field order.",
+                    c.credit_field,
+                    f.id
+                ));
             }
-        },
+        }
         AmountFormat::TransactionTypeAndAmountFields(ref c) => {
             if !f.field_order.contains(&c.amount_field) {
-                return Err(format!("Amount field name [{}] for format [{}] not included in field order.",
-                                   c.amount_field, f.id));
+                return Err(anyhow!(
+                    "Amount field name [{}] for format [{}] not included in field order.",
+                    c.amount_field,
+                    f.id
+                ));
             }
             if !f.field_order.contains(&c.transaction_type_field) {
-                return Err(format!("Transaction type field name [{}] for format [{}] not included in field order.",
-                                   c.transaction_type_field, f.id));
+                return Err(anyhow!(
+                    "Transaction type field name [{}] for format [{}] not included in field order.",
+                    c.transaction_type_field,
+                    f.id
+                ));
             }
-        },
+        }
     }
     Ok(())
 }

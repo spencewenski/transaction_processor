@@ -1,22 +1,22 @@
-use transaction::{Transaction, TransactionStatus};
-use std::io;
-use std::fs::File;
+use anyhow::anyhow;
 use config::{Config, SortOrder};
+use std::fs::File;
+use std::io;
+use transaction::{Transaction, TransactionStatus};
 
 mod formats;
 
-pub struct TransactionIO {
-}
+pub struct TransactionIO {}
 
 impl TransactionIO {
-    pub fn import(config: &Config) -> Result<Vec<Transaction>, String> {
+    pub fn import(config: &Config) -> anyhow::Result<Vec<Transaction>> {
         let r: Box<dyn io::Read> = match config.src_file() {
             Option::Some(f) => {
                 let f = File::open(f).map_err(|e| {
-                    format!("An error occurred while trying to open file [{}]: {}", f, e)
+                    anyhow!("An error occurred while trying to open file [{}]: {}", f, e)
                 })?;
                 Box::new(io::BufReader::new(f))
-            },
+            }
             Option::None => Box::new(io::stdin()),
         };
         let transactions = formats::import_from_configurable_format(r, config.src_format())?;
@@ -25,17 +25,17 @@ impl TransactionIO {
         Ok(transactions)
     }
 
-    pub fn export(config: &Config, transactions: Vec<Transaction>) -> Result<(), String> {
+    pub fn export(config: &Config, transactions: Vec<Transaction>) -> anyhow::Result<()> {
         // Sort transactions just before exporting
         let transactions = sort(config, transactions);
         let w: Box<dyn io::Write> = match config.dst_file() {
             Option::Some(f) => {
                 let f = File::create(f).map_err(|e| {
-                    format!("An error occurred while trying to open file [{}]: {}", f, e)
+                    anyhow!("An error occurred while trying to open file [{}]: {}", f, e)
                 })?;
                 Box::new(io::BufWriter::new(f))
-            },
-            Option::None => Box::new(io::stdout())
+            }
+            Option::None => Box::new(io::stdout()),
         };
         formats::export_to_configurable_format(w, config, config.dst_format(), transactions)?;
         Ok(())
@@ -48,13 +48,14 @@ fn filter(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transactio
     if !config.ignore_pending() {
         return transactions;
     }
-    transactions.retain(|e| {
-        e.status == TransactionStatus::Cleared
-    });
+    transactions.retain(|e| e.status == TransactionStatus::Cleared);
     transactions
 }
 
-fn normalize_and_categorize(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+fn normalize_and_categorize(
+    config: &Config,
+    mut transactions: Vec<Transaction>,
+) -> Vec<Transaction> {
     transactions.iter_mut().for_each(|t| {
         t.normalize_payee(config);
         t.categorize(config);

@@ -1,6 +1,7 @@
+use anyhow::anyhow;
+use currency::Currency;
 use std::fs::File;
 use std::io;
-use currency::Currency;
 
 pub fn get_optional_string(s: &str) -> Option<String> {
     if s.trim().len() > 0 {
@@ -10,10 +11,10 @@ pub fn get_optional_string(s: &str) -> Option<String> {
     }
 }
 
-pub fn reader_from_file_name(filename: &str) -> Result<Box<dyn io::Read>, String> {
+pub fn reader_from_file_name(filename: &str) -> anyhow::Result<Box<dyn io::Read>> {
     match File::open(filename) {
         Ok(f) => Ok(Box::new(io::BufReader::new(f))),
-        Err(e) => Err(format!("Unable to open file [{}]: {}", filename, e)),
+        Err(e) => Err(anyhow!("Unable to open file [{}]: {}", filename, e)),
     }
 }
 

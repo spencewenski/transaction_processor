@@ -8,31 +8,37 @@ pub struct PayeeNormalizer {}
 
 impl PayeeNormalizer {
     pub fn normalized_payee_id(config: &Config, s: &str) -> Option<String> {
-        for n in &config.account().payee_normalizers {
-            match &n.normalizer_type {
-                MatcherType::Exact { exact_match_string } => {
-                    let cmp_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, s);
-                    let exact_match_string =
-                        PayeeNormalizer::maybe_to_lower(n.ignore_case, exact_match_string);
-                    if exact_match_string == cmp_string {
-                        return Option::Some(n.payee_id.to_owned());
+        for (payee_id, payee) in &config.account().payees {
+            for normalizer in &payee.normalizers {
+                match &normalizer.normalizer_type {
+                    MatcherType::Exact { exact_match_string } => {
+                        let cmp_string = PayeeNormalizer::maybe_to_lower(normalizer.ignore_case, s);
+                        let exact_match_string = PayeeNormalizer::maybe_to_lower(
+                            normalizer.ignore_case,
+                            exact_match_string,
+                        );
+                        if exact_match_string == cmp_string {
+                            return Option::Some(payee_id.to_owned());
+                        }
                     }
-                }
-                MatcherType::Contains { contains_string } => {
-                    let cmp_string = PayeeNormalizer::maybe_to_lower(n.ignore_case, s);
-                    let contains_string =
-                        PayeeNormalizer::maybe_to_lower(n.ignore_case, contains_string);
-                    if cmp_string.contains(&contains_string) {
-                        return Option::Some(n.payee_id.to_owned());
+                    MatcherType::Contains { contains_string } => {
+                        let cmp_string = PayeeNormalizer::maybe_to_lower(normalizer.ignore_case, s);
+                        let contains_string = PayeeNormalizer::maybe_to_lower(
+                            normalizer.ignore_case,
+                            contains_string,
+                        );
+                        if cmp_string.contains(&contains_string) {
+                            return Option::Some(payee_id.to_owned());
+                        }
                     }
-                }
-                MatcherType::Regex { regex_string } => {
-                    let re = RegexBuilder::new(regex_string)
-                        .case_insensitive(n.ignore_case)
-                        .build()
-                        .expect(&format!("[{}] is not a valid regex", regex_string));
-                    if re.is_match(s) {
-                        return Option::Some(n.payee_id.to_owned());
+                    MatcherType::Regex { regex_string } => {
+                        let re = RegexBuilder::new(regex_string)
+                            .case_insensitive(normalizer.ignore_case)
+                            .build()
+                            .expect(&format!("[{}] is not a valid regex", regex_string));
+                        if re.is_match(s) {
+                            return Option::Some(payee_id.to_owned());
+                        }
                     }
                 }
             }

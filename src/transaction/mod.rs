@@ -1,10 +1,11 @@
+use anyhow::anyhow;
 use chrono::prelude::*;
-use transaction::payee::PayeeNormalizer;
 use config::Config;
 use currency::Currency;
-use num::{Signed};
+use num::Signed;
 use std::ops::Neg;
-use util::{currency_to_string_without_delim};
+use transaction::payee::PayeeNormalizer;
+use util::currency_to_string_without_delim;
 
 pub mod payee;
 pub mod transaction_io;
@@ -36,17 +37,24 @@ enum TransactionStatus {
 }
 
 impl Transaction {
-    fn build(date: String,
-             date_format: String,
-             payee: String,
-             category: Option<String>,
-             transaction_type: TransactionType,
-             amount: Currency,
-             status: TransactionStatus,
-             memo: Option<String>) -> Result<Transaction, String> {
+    fn build(
+        date: String,
+        date_format: String,
+        payee: String,
+        category: Option<String>,
+        transaction_type: TransactionType,
+        amount: Currency,
+        status: TransactionStatus,
+        memo: Option<String>,
+    ) -> anyhow::Result<Transaction> {
         let date = match Utc.datetime_from_str(&date, &date_format) {
             Ok(date) => Ok(date),
-            Err(e) => Err(format!("Unable to parse date string [{}] using date format string [{}]; error: {}", date, date_format, e)),
+            Err(e) => Err(anyhow!(
+                "Unable to parse date string [{}] using date format string [{}]; error: {}",
+                date,
+                date_format,
+                e
+            )),
         }?;
         Ok(Transaction {
             date,
@@ -62,12 +70,13 @@ impl Transaction {
     }
 
     pub fn normalize_payee(&mut self, config: &Config) {
-        self.normalized_payee_id = PayeeNormalizer::normalized_payee_id(config, &self.raw_payee_name);
-        self.normalized_payee_name = self.normalized_payee_id.as_ref().and_then(|p| {
-            config.account().payees.get(p)
-        }).and_then(|x| {
-            Option::Some(x.name.to_owned())
-        });
+        self.normalized_payee_id =
+            PayeeNormalizer::normalized_payee_id(config, &self.raw_payee_name);
+        self.normalized_payee_name = self
+            .normalized_payee_id
+            .as_ref()
+            .and_then(|p| config.account().payees.get(p))
+            .and_then(|x| Option::Some(x.name.to_owned()));
     }
 
     pub fn categorize(&mut self, config: &Config) {
