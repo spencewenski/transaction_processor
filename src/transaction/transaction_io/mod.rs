@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use config::{Config, SortOrder};
+use config::{Config, SortBy, SortOrder};
 use std::fs::File;
 use std::io;
 use transaction::{Transaction, TransactionStatus};
@@ -72,12 +72,21 @@ fn normalize_and_categorize(
 }
 
 fn sort(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction> {
+    if config.sort_by().is_none() || config.sort_order().is_none() {
+        return transactions;
+    }
+
+    let get_data_fn = match config.sort_by().unwrap() {
+        // todo: don't create an owned copy
+        SortBy::Date => |t: &Transaction| t.date().to_owned(),
+    };
+
     if let Option::Some(ref sort_order) = config.sort_order() {
         transactions.sort_by(|a, b| {
             if SortOrder::Ascending == *sort_order {
-                a.date().cmp(&b.date())
+                get_data_fn(a).cmp(&get_data_fn(&b))
             } else {
-                a.date().cmp(&b.date()).reverse()
+                get_data_fn(a).cmp(&get_data_fn(b)).reverse()
             }
         });
     }

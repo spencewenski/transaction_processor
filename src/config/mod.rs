@@ -80,6 +80,18 @@ impl Config {
             .or(Some(SortOrder::Ascending))
     }
 
+    pub fn sort_by(&self) -> Option<SortBy> {
+        if self.args.sort_by.is_some() {
+            return self.args.sort_by.clone();
+        }
+
+        self.dst_format()
+            .sort
+            .as_ref()
+            .map(|sort| sort.sort_by.clone())
+            .or(Some(SortBy::Date))
+    }
+
     /// Whether to include the header in CSV output
     pub fn include_header(&self) -> bool {
         self.args
