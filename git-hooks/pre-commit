@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Check code formatting before checking in
+cargo fmt --check
