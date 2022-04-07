@@ -56,9 +56,9 @@ fn get_raw_payee_name(
     }
 }
 
-const DEFAULT_TIME: &'static str = "00:00:00";
-const DEFAULT_TIME_FORMAT: &'static str = "%T";
-const DEFAULT_DATE_TIME_DELIMINATOR: &'static str = " ";
+const DEFAULT_TIME: &str = "00:00:00";
+const DEFAULT_TIME_FORMAT: &str = "%T";
+const DEFAULT_DATE_TIME_DELIMINATOR: &str = " ";
 
 fn get_date_time_and_format(
     unmapped: &HashMap<String, String>,
@@ -81,7 +81,7 @@ fn get_date_time_and_format(
         .date_time_config
         .deliminator
         .to_owned()
-        .unwrap_or(String::from(DEFAULT_DATE_TIME_DELIMINATOR));
+        .unwrap_or_else(|| String::from(DEFAULT_DATE_TIME_DELIMINATOR));
 
     let (time, time_format) = if let Option::Some(time) = time {
         (
@@ -89,7 +89,7 @@ fn get_date_time_and_format(
             f.date_time_config
                 .time_format
                 .to_owned()
-                .unwrap_or(String::from(DEFAULT_TIME_FORMAT)),
+                .unwrap_or_else(|| String::from(DEFAULT_TIME_FORMAT)),
         )
     } else {
         (
@@ -184,13 +184,14 @@ fn get_amount_and_transaction_type(
 }
 
 fn get_currency_from_str(s: &str) -> Option<anyhow::Result<Currency>> {
-    get_optional_string(s).and_then(|s| match Currency::from_str(&s) {
-        Ok(c) => Option::Some(Ok(c)),
-        Err(e) => Option::Some(Err(anyhow!(
-            "Unable to parse amount [{}] into a valid currency: {}",
-            s,
-            e
-        ))),
+    get_optional_string(s).map(|s| {
+        Currency::from_str(&s).map_err(|e| {
+            anyhow!(
+                "Unable to parse amount [{}] into a valid currency: {}",
+                s,
+                e
+            )
+        })
     })
 }
 
@@ -220,19 +221,17 @@ fn get_transaction_status(
 }
 
 fn get_memo(unmapped: &HashMap<String, String>, f: &FormatConfigFile) -> Option<String> {
-    f.memo_config.as_ref().and_then(|c| {
-        unmapped
-            .get(&c.field_name)
-            .and_then(|x| Option::Some(x.to_owned()))
-    })
+    f.memo_config
+        .as_ref()
+        .and_then(|c| unmapped.get(&c.field_name))
+        .map(|x| x.to_owned())
 }
 
 fn get_category(unmapped: &HashMap<String, String>, f: &FormatConfigFile) -> Option<String> {
-    f.category_config.as_ref().and_then(|c| {
-        unmapped
-            .get(&c.field_name)
-            .and_then(|x| Option::Some(x.to_owned()))
-    })
+    f.category_config
+        .as_ref()
+        .and_then(|c| unmapped.get(&c.field_name))
+        .map(|x| x.to_owned())
 }
 
 /// Assumes CSV
@@ -252,7 +251,7 @@ pub fn export_to_configurable_format(
     Ok(())
 }
 
-fn write_record(w: &mut Writer<Box<dyn io::Write>>, r: &Vec<String>) -> anyhow::Result<()> {
+fn write_record(w: &mut Writer<Box<dyn io::Write>>, r: &[String]) -> anyhow::Result<()> {
     if let Err(e) = w.write_record(r) {
         return Err(anyhow!(
             "An error occurred while writing to the destination: {}",
@@ -276,7 +275,7 @@ fn convert_to_configurable_format(f: &FormatConfigFile, t: &Transaction) -> Vec<
             time_field.to_owned(),
             t.date()
                 .format(
-                    &f.date_time_config
+                    f.date_time_config
                         .time_format
                         .as_ref()
                         .unwrap_or(&String::from(DEFAULT_TIME_FORMAT)),
@@ -292,7 +291,7 @@ fn convert_to_configurable_format(f: &FormatConfigFile, t: &Transaction) -> Vec<
     if let Option::Some(ref c) = f.category_config {
         fields.insert(
             c.field_name.to_owned(),
-            t.category.to_owned().unwrap_or(Default::default()),
+            t.category.to_owned().unwrap_or_default(),
         );
     }
 
@@ -322,7 +321,7 @@ fn convert_to_configurable_format(f: &FormatConfigFile, t: &Transaction) -> Vec<
     // Put the fields in the correct order
     let mut r = Vec::new();
     for field in &f.field_order {
-        r.push(fields.remove(field).unwrap_or(Default::default()));
+        r.push(fields.remove(field).unwrap_or_default());
     }
     r
 }
@@ -347,11 +346,11 @@ fn get_amount_fields(f: &FormatConfigFile, t: &Transaction) -> Vec<(String, Stri
             };
             r.push((
                 c.debit_field.to_owned(),
-                debit_amount.map_or(Default::default(), |x| currency_to_string_without_delim(x)),
+                debit_amount.map_or(Default::default(), currency_to_string_without_delim),
             ));
             r.push((
                 c.credit_field.to_owned(),
-                credit_amount.map_or(Default::default(), |x| currency_to_string_without_delim(x)),
+                credit_amount.map_or(Default::default(), currency_to_string_without_delim),
             ));
         }
         AmountFormat::TransactionTypeAndAmountFields(ref c) => {

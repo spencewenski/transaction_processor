@@ -84,7 +84,7 @@ fn sort(config: &Config, mut transactions: Vec<Transaction>) -> Vec<Transaction>
     if let Option::Some(ref sort_order) = config.sort_order() {
         transactions.sort_by(|a, b| {
             if SortOrder::Ascending == *sort_order {
-                get_data_fn(a).cmp(&get_data_fn(&b))
+                get_data_fn(a).cmp(&get_data_fn(b))
             } else {
                 get_data_fn(a).cmp(&get_data_fn(b)).reverse()
             }

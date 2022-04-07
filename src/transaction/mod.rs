@@ -76,12 +76,12 @@ impl Transaction {
             .normalized_payee_id
             .as_ref()
             .and_then(|p| config.account().payees.get(p))
-            .and_then(|x| Option::Some(x.name.to_owned()));
+            .map(|x| x.name.to_owned());
     }
 
     pub fn categorize(&mut self, config: &Config) {
-        self.category = PayeeNormalizer::category_for_transaction(config, &self);
-        if let Option::None = self.category {
+        self.category = PayeeNormalizer::category_for_transaction(config, self);
+        if self.category.is_none() {
             println!("Transaction was not categorized: [payee: {}], [amount: {}], [type: {:?}], [date: {}]",
                      self.payee(), currency_to_string_without_delim(&self.amount), self.transaction_type, self.date);
         }
@@ -117,15 +117,12 @@ trait Clean<T> {
 
 impl Clean<String> for InputCleaner {
     fn clean(s: String) -> String {
-        s.trim().replace("\n", " ")
+        s.trim().replace('\n', " ")
     }
 }
 
 impl Clean<Option<String>> for InputCleaner {
     fn clean(s: Option<String>) -> Option<String> {
-        match s {
-            Option::Some(s) => Option::Some(Self::clean(s)),
-            _ => Option::None,
-        }
+        s.map(Self::clean)
     }
 }

@@ -35,7 +35,7 @@ impl PayeeNormalizer {
                         let re = RegexBuilder::new(regex_string)
                             .case_insensitive(normalizer.ignore_case)
                             .build()
-                            .expect(&format!("[{}] is not a valid regex", regex_string));
+                            .unwrap_or_else(|_| panic!("[{}] is not a valid regex", regex_string));
                         if re.is_match(s) {
                             return Option::Some(payee_id.to_owned());
                         }
@@ -56,35 +56,32 @@ impl PayeeNormalizer {
     }
 
     pub fn category_for_transaction(config: &Config, transaction: &Transaction) -> Option<String> {
-        if let Option::None = transaction.normalized_payee_id {
-            return Option::None;
-        }
         transaction
             .normalized_payee_id
             .as_ref()
             .and_then(|p| config.account().payees.get(p))
             .and_then(|p| p.category_ids.as_ref())
             .and_then(|c| {
-                if c.len() == 0 {
+                if c.is_empty() {
                     return Option::None;
                 }
                 if c.len() == 1 {
                     return c.first();
                 }
                 if !config.skip_prompts() {
-                    return PayeeNormalizer::prompt_select_category_id(config, transaction, c);
+                    PayeeNormalizer::prompt_select_category_id(config, transaction, c)
                 } else {
-                    return Option::None;
+                    Option::None
                 }
             })
             .and_then(|x| config.category(x))
-            .and_then(|c| Option::Some(c.name.to_owned()))
+            .map(|c| c.name.to_owned())
     }
 
     fn prompt_select_category_id<'a>(
         config: &'a Config,
         transaction: &Transaction,
-        category_ids: &'a Vec<String>,
+        category_ids: &'a [String],
     ) -> Option<&'a String> {
         println!();
         println!("Multiple categories available for transaction: [payee: {}], [amount: {}], [date: {}], [raw payee: {}], [memo: {:?}], [status: {:?}]",
@@ -92,7 +89,7 @@ impl PayeeNormalizer {
                  transaction.raw_payee_name, transaction.memo, transaction.status);
         println!("Please select an option:");
 
-        println!("{}. {}", 0, "(skip)");
+        println!("{}. (skip)", 0);
         for (i, category_id) in category_ids.iter().enumerate() {
             if let Option::Some(c) = config.category(category_id) {
                 println!("{}. {}", i + 1, c.name);
@@ -100,7 +97,7 @@ impl PayeeNormalizer {
         }
         let num: usize = read!();
         if num == 0 {
-            return Option::None;
+            Option::None
         } else {
             category_ids.get(num - 1)
         }

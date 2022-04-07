@@ -7,7 +7,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use util;
 
 mod arguments;
@@ -131,7 +131,7 @@ struct CategoriesConfigFile {
 }
 
 impl CategoriesConfigFile {
-    fn from_file(filename: &PathBuf) -> anyhow::Result<CategoriesConfigFile> {
+    fn from_file(filename: &Path) -> anyhow::Result<CategoriesConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: CategoriesConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)
@@ -155,7 +155,7 @@ pub struct AccountConfigFile {
 }
 
 impl AccountConfigFile {
-    fn from_file(filename: &PathBuf) -> anyhow::Result<AccountConfigFile> {
+    fn from_file(filename: &Path) -> anyhow::Result<AccountConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: AccountConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)
@@ -260,7 +260,7 @@ fn validate_payees(config: &Config) -> anyhow::Result<()> {
     for (p_id, p) in &config.account_config_file.payees {
         if let Option::Some(ref category_ids) = p.category_ids {
             for c_id in category_ids {
-                if let Option::None = config.categories_config_file.categories.get(c_id) {
+                if config.categories_config_file.categories.get(c_id).is_none() {
                     return Err(anyhow!(
                         "Category [{}] does not exist. Referenced from payee [{}].",
                         c_id,
@@ -345,7 +345,7 @@ pub struct FormatConfigFile {
 }
 
 impl FormatConfigFile {
-    fn from_file(filename: &PathBuf) -> anyhow::Result<FormatConfigFile> {
+    fn from_file(filename: &Path) -> anyhow::Result<FormatConfigFile> {
         let r = util::reader_from_file_name(filename)?;
         let config_file: FormatConfigFile = serde_json::from_reader(r)?;
         Ok(config_file)
