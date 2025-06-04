@@ -177,8 +177,12 @@ fn get_amount_and_transaction_type(
                     } else if t == &c.debit_string {
                         Ok(TransactionType::Debit)
                     } else {
-                        Err(anyhow!("String [{}] matches neither the credit string [{}] nor the debit string [{}]",
-                                    t, c.credit_string, c.debit_string))
+                        Err(anyhow!(
+                            "String [{}] matches neither the credit string [{}] nor the debit string [{}]",
+                            t,
+                            c.credit_string,
+                            c.debit_string
+                        ))
                     }
                 }
                 _ => Err(anyhow!(
@@ -215,8 +219,12 @@ fn get_transaction_status(
                 } else if s == &c.pending_string {
                     Ok(TransactionStatus::Pending)
                 } else {
-                    Err(anyhow!("String [{}] matches neither the cleard string [{}] nor the pending string [{}]",
-                                s, c.cleared_string, c.pending_string))
+                    Err(anyhow!(
+                        "String [{}] matches neither the cleard string [{}] nor the pending string [{}]",
+                        s,
+                        c.cleared_string,
+                        c.pending_string
+                    ))
                 }
             }
             _ => Err(anyhow!(

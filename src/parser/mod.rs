@@ -3,7 +3,7 @@ use csv;
 use csv::Writer;
 use serde;
 use serde::de::Error;
-use serde::{de, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de};
 use std;
 use std::collections::HashMap;
 use std::io;

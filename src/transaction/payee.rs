@@ -84,9 +84,16 @@ impl PayeeNormalizer {
         category_ids: &'a [String],
     ) -> Option<&'a String> {
         println!();
-        println!("Multiple categories available for transaction: [payee: {}], [amount: {}], [type: {:?}], [date: {}], [raw payee: {}], [memo: {:?}], [status: {:?}]",
-                 transaction.payee(), currency_to_string_without_delim(&transaction.amount), transaction.transaction_type, transaction.date,
-                 transaction.raw_payee_name, transaction.memo, transaction.status);
+        println!(
+            "Multiple categories available for transaction: [payee: {}], [amount: {}], [type: {:?}], [date: {}], [raw payee: {}], [memo: {:?}], [status: {:?}]",
+            transaction.payee(),
+            currency_to_string_without_delim(&transaction.amount),
+            transaction.transaction_type,
+            transaction.date,
+            transaction.raw_payee_name,
+            transaction.memo,
+            transaction.status
+        );
         println!("Please select an option:");
 
         println!("{}. (skip)", 0);

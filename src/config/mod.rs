@@ -1,5 +1,5 @@
 use crate::config::arguments::Arguments;
-use crate::parser::{default_false, default_true, deserialize_keyed_items, Keyed};
+use crate::parser::{Keyed, default_false, default_true, deserialize_keyed_items};
 use crate::util;
 use anyhow::anyhow;
 use clap::Parser;
@@ -176,10 +176,16 @@ impl Keyed<String> for AccountConfigFile {
 
 fn validate_account_config(config: &Config) -> anyhow::Result<()> {
     if config.account_config_file.format_id != config.src_format_config_file.id {
-        Err(anyhow!("Format ID [{}] for account [{}] is different from the ID of the provided source format file [{}].",
+        Err(anyhow!(
+            "Format ID [{}] for account [{}] is different from the ID of the provided source format file [{}].",
             config.account_config_file.format_id,
             config.account_config_file.name,
-            config.args.src_format_config_file.to_str().unwrap_or("Invalid file name")))
+            config
+                .args
+                .src_format_config_file
+                .to_str()
+                .unwrap_or("Invalid file name")
+        ))
     } else {
         Ok(())
     }
