@@ -301,13 +301,13 @@ pub struct Sort {
     pub order: SortOrder,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone, clap::ArgEnum)]
+#[derive(Debug, Deserialize, PartialEq, Clone, clap::ValueEnum)]
 pub enum SortBy {
     #[serde(rename = "date")]
     Date,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone, clap::ArgEnum)]
+#[derive(Debug, Deserialize, PartialEq, Clone, clap::ValueEnum)]
 pub enum SortOrder {
     #[serde(rename = "ascending")]
     Ascending,

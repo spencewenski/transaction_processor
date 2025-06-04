@@ -12,7 +12,7 @@ pub mod transaction_io;
 
 #[derive(Debug)]
 pub struct Transaction {
-    date: DateTime<Utc>,
+    date: DateTime<FixedOffset>,
     raw_payee_name: String,
     normalized_payee_id: Option<String>,
     normalized_payee_name: Option<String>,
@@ -47,7 +47,7 @@ impl Transaction {
         status: TransactionStatus,
         memo: Option<String>,
     ) -> anyhow::Result<Transaction> {
-        let date = match Utc.datetime_from_str(&date, &date_format) {
+        let date = match DateTime::parse_from_str(&date, &date_format) {
             Ok(date) => Ok(date),
             Err(e) => Err(anyhow!(
                 "Unable to parse date string [{}] using date format string [{}]; error: {}",
@@ -87,7 +87,7 @@ impl Transaction {
         }
     }
 
-    pub fn date(&self) -> &DateTime<Utc> {
+    pub fn date(&self) -> &DateTime<FixedOffset> {
         &self.date
     }
 

@@ -5,21 +5,21 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Arguments {
-    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    #[clap(long, value_parser, value_name = "FILE")]
     pub account_config_file: PathBuf,
-    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    #[clap(long, value_parser, value_name = "FILE")]
     pub categories_config_file: PathBuf,
-    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    #[clap(long, value_parser, value_name = "FILE")]
     pub src_format_config_file: PathBuf,
-    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    #[clap(long, value_parser, value_name = "FILE")]
     pub dst_format_config_file: PathBuf,
-    #[clap(short = 'i', long, parse(from_os_str), value_name = "FILE")]
+    #[clap(short = 'i', long, value_parser, value_name = "FILE")]
     pub src_file: Option<PathBuf>,
-    #[clap(short = 'o', long, parse(from_os_str), value_name = "FILE")]
+    #[clap(short = 'o', long, value_parser, value_name = "FILE")]
     pub dst_file: Option<PathBuf>,
-    #[clap(long, arg_enum)]
+    #[clap(long, value_enum)]
     pub sort_by: Option<SortBy>,
-    #[clap(long, arg_enum)]
+    #[clap(long, value_enum)]
     pub sort_order: Option<SortOrder>,
     #[clap(long)]
     pub include_header: Option<bool>,
