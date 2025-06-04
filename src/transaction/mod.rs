@@ -1,26 +1,32 @@
-use anyhow::anyhow;
+use crate::config::Config;
+use crate::transaction::payee::PayeeNormalizer;
+use crate::util::currency_to_string_without_delim;
 use chrono::prelude::*;
-use config::Config;
 use currency::Currency;
 use num::Signed;
 use std::ops::Neg;
-use transaction::payee::PayeeNormalizer;
-use util::currency_to_string_without_delim;
+use typed_builder::TypedBuilder;
 
 pub mod payee;
 pub mod transaction_io;
 
-#[derive(Debug)]
+#[derive(Debug, TypedBuilder)]
 pub struct Transaction {
     date: DateTime<FixedOffset>,
+    #[builder(setter(transform = |value: String| InputCleaner::clean(value) ))]
     raw_payee_name: String,
+    #[builder(default)]
     normalized_payee_id: Option<String>,
+    #[builder(default)]
     normalized_payee_name: Option<String>,
+    #[builder(default, setter(transform = |value: Option<String>| value.map(InputCleaner::clean )))]
     category: Option<String>,
     transaction_type: TransactionType,
     // Non-negative
+    #[builder(setter(transform = |value: Currency| get_currency_absolute_value(value) ))]
     amount: Currency,
     status: TransactionStatus,
+    #[builder(default, setter(transform = |value: Option<String>| value.map(InputCleaner::clean )))]
     memo: Option<String>,
 }
 
@@ -37,37 +43,37 @@ enum TransactionStatus {
 }
 
 impl Transaction {
-    fn build(
-        date: String,
-        date_format: String,
-        payee: String,
-        category: Option<String>,
-        transaction_type: TransactionType,
-        amount: Currency,
-        status: TransactionStatus,
-        memo: Option<String>,
-    ) -> anyhow::Result<Transaction> {
-        let date = match DateTime::parse_from_str(&date, &date_format) {
-            Ok(date) => Ok(date),
-            Err(e) => Err(anyhow!(
-                "Unable to parse date string [{}] using date format string [{}]; error: {}",
-                date,
-                date_format,
-                e
-            )),
-        }?;
-        Ok(Transaction {
-            date,
-            raw_payee_name: InputCleaner::clean(payee),
-            normalized_payee_id: Option::None,
-            normalized_payee_name: Option::None,
-            category: InputCleaner::clean(category),
-            transaction_type,
-            amount: get_currency_absolute_value(amount),
-            status,
-            memo: InputCleaner::clean(memo),
-        })
-    }
+    // fn build(
+    //     date: String,
+    //     date_format: String,
+    //     payee: String,
+    //     category: Option<String>,
+    //     transaction_type: TransactionType,
+    //     amount: Currency,
+    //     status: TransactionStatus,
+    //     memo: Option<String>,
+    // ) -> anyhow::Result<Transaction> {
+    //     let date = match DateTime::parse_from_str(&date, &date_format) {
+    //         Ok(date) => Ok(date),
+    //         Err(e) => Err(anyhow!(
+    //             "Unable to parse date string [{}] using date format string [{}]; error: {}",
+    //             date,
+    //             date_format,
+    //             e
+    //         )),
+    //     }?;
+    //     Ok(Transaction {
+    //         date,
+    //         raw_payee_name: InputCleaner::clean(payee),
+    //         normalized_payee_id: Option::None,
+    //         normalized_payee_name: Option::None,
+    //         category: InputCleaner::clean(category),
+    //         transaction_type,
+    //         amount: get_currency_absolute_value(amount),
+    //         status,
+    //         memo: InputCleaner::clean(memo),
+    //     })
+    // }
 
     pub fn normalize_payee(&mut self, config: &Config) {
         self.normalized_payee_id =

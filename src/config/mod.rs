@@ -1,14 +1,14 @@
+use crate::config::arguments::Arguments;
+use crate::parser::{default_false, default_true, deserialize_keyed_items, Keyed};
+use crate::util;
 use anyhow::anyhow;
 use clap::Parser;
-use config::arguments::Arguments;
-use parser::{default_false, default_true, deserialize_keyed_items, Keyed};
 use regex::RegexBuilder;
 use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
-use util;
 
 mod arguments;
 
@@ -260,7 +260,7 @@ fn validate_payees(config: &Config) -> anyhow::Result<()> {
     for (p_id, p) in &config.account_config_file.payees {
         if let Option::Some(ref category_ids) = p.category_ids {
             for c_id in category_ids {
-                if config.categories_config_file.categories.get(c_id).is_none() {
+                if !config.categories_config_file.categories.contains_key(c_id) {
                     return Err(anyhow!(
                         "Category [{}] does not exist. Referenced from payee [{}].",
                         c_id,

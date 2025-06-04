@@ -1,7 +1,7 @@
-use config::{Config, MatcherType};
+use crate::config::{Config, MatcherType};
+use crate::transaction::Transaction;
+use crate::util::currency_to_string_without_delim;
 use regex::RegexBuilder;
-use transaction::Transaction;
-use util::currency_to_string_without_delim;
 
 #[derive(Debug)]
 pub struct PayeeNormalizer {}

@@ -2,6 +2,8 @@
 name = "transaction_processor"
 version = "0.1.0"
 authors = ["\"Spencer Ferris\" <git@spencewenski.com>"]
+rust-version = "1.85"
+edition = "2024"
 
 [dependencies]
 chrono = "0.4"
@@ -15,3 +17,4 @@ currency = "0.4"
 num = "0.4.3"
 anyhow = "1"
 clap = { version = "4.5.39", features = ["derive"] }
+typed-builder = { version = "0.21.0" }

@@ -32,8 +32,8 @@ pub fn currency_to_string_without_delim(c: &Currency) -> String {
 
 #[cfg(test)]
 mod test {
+    use crate::util::{currency_to_string_without_delim, get_optional_string};
     use currency::Currency;
-    use util::{currency_to_string_without_delim, get_optional_string};
 
     #[test]
     fn test_currency_to_string_without_delim() {

@@ -1,15 +1,16 @@
+use crate::config::Config;
+use crate::config::{AmountFormat, FormatConfigFile};
+use crate::parser::{create_csv_writer, parse_csv_from_reader};
+use crate::transaction::{Transaction, TransactionStatus, TransactionType};
+use crate::util::{currency_to_string_without_delim, get_optional_string};
 use anyhow::anyhow;
-use config::Config;
-use config::{AmountFormat, FormatConfigFile};
+use chrono::DateTime;
 use csv::Writer;
 use currency::Currency;
 use num::Signed;
-use parser::{create_csv_writer, parse_csv_from_reader};
 use std::collections::HashMap;
 use std::io;
 use std::ops::Neg;
-use transaction::{Transaction, TransactionStatus, TransactionType};
-use util::{currency_to_string_without_delim, get_optional_string};
 
 pub fn import_from_configurable_format(
     r: Box<dyn io::Read>,
@@ -31,16 +32,25 @@ fn convert_to_transaction(
 ) -> anyhow::Result<Transaction> {
     let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f)?;
     let (date_time_string, date_time_format) = get_date_time_and_format(&unmapped, f)?;
-    Transaction::build(
-        date_time_string,
-        date_time_format,
-        get_raw_payee_name(&unmapped, f)?,
-        get_category(&unmapped, f),
-        transaction_type,
-        amount,
-        get_transaction_status(&unmapped, f)?,
-        get_memo(&unmapped, f),
-    )
+    let date = match DateTime::parse_from_str(&date_time_string, &date_time_format) {
+        Ok(date) => Ok(date),
+        Err(e) => Err(anyhow!(
+            "Unable to parse date string [{}] using date format string [{}]; error: {}",
+            date_time_string,
+            date_time_format,
+            e
+        )),
+    }?;
+
+    Ok(Transaction::builder()
+        .date(date)
+        .raw_payee_name(get_raw_payee_name(&unmapped, f)?)
+        .category(get_category(&unmapped, f))
+        .transaction_type(transaction_type)
+        .amount(amount)
+        .status(get_transaction_status(&unmapped, f)?)
+        .memo(get_memo(&unmapped, f))
+        .build())
 }
 
 fn get_raw_payee_name(
@@ -123,12 +133,10 @@ fn get_amount_and_transaction_type(
                 } else {
                     TransactionType::Credit
                 }
+            } else if c.debit_is_negative {
+                TransactionType::Credit
             } else {
-                if c.debit_is_negative {
-                    TransactionType::Credit
-                } else {
-                    TransactionType::Debit
-                }
+                TransactionType::Debit
             };
 
             Ok((amount, transaction_type))

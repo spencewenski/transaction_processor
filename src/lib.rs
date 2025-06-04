@@ -11,6 +11,7 @@ extern crate anyhow;
 extern crate clap;
 extern crate currency;
 extern crate num;
+extern crate typed_builder;
 
 pub mod config;
 pub mod parser;
