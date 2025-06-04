@@ -31,7 +31,7 @@ fn convert_to_transaction(
     f: &FormatConfigFile,
 ) -> anyhow::Result<Transaction> {
     let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f)?;
-    let (date_time_string, date_time_format) = get_date_time_and_format(&unmapped, f)?;
+    let (date_time_string, date_time_format) = get_date(&unmapped, f)?;
     let date = match DateTime::parse_from_str(&date_time_string, &date_time_format) {
         Ok(date) => Ok(date),
         Err(e) => Err(anyhow!(
@@ -66,11 +66,11 @@ fn get_raw_payee_name(
     }
 }
 
-const DEFAULT_TIME: &str = "00:00:00";
-const DEFAULT_TIME_FORMAT: &str = "%T";
+const DEFAULT_TIME: &str = "00:00:00+0000";
+const DEFAULT_TIME_FORMAT: &str = "%H:%M:%S%z";
 const DEFAULT_DATE_TIME_DELIMINATOR: &str = " ";
 
-fn get_date_time_and_format(
+fn get_date(
     unmapped: &HashMap<String, String>,
     f: &FormatConfigFile,
 ) -> anyhow::Result<(String, String)> {
