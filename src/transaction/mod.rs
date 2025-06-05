@@ -12,7 +12,7 @@ pub mod transaction_io;
 
 #[derive(Debug, TypedBuilder)]
 pub struct Transaction {
-    date: DateTime<FixedOffset>,
+    date: NaiveDateTime,
     #[builder(setter(transform = |value: String| InputCleaner::clean(value) ))]
     raw_payee_name: String,
     #[builder(default)]
@@ -66,7 +66,7 @@ impl Transaction {
         }
     }
 
-    pub fn date(&self) -> &DateTime<FixedOffset> {
+    pub fn date(&self) -> &NaiveDateTime {
         &self.date
     }
 

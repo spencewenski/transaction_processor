@@ -4,7 +4,7 @@ use crate::parser::{create_csv_writer, parse_csv_from_reader};
 use crate::transaction::{Transaction, TransactionStatus, TransactionType};
 use crate::util::{currency_to_string_without_delim, get_optional_string};
 use anyhow::anyhow;
-use chrono::DateTime;
+use chrono::NaiveDateTime;
 use csv::Writer;
 use currency::Currency;
 use num::Signed;
@@ -32,7 +32,7 @@ fn convert_to_transaction(
 ) -> anyhow::Result<Transaction> {
     let (amount, transaction_type) = get_amount_and_transaction_type(&unmapped, f)?;
     let (date_time_string, date_time_format) = get_date(&unmapped, f)?;
-    let date = match DateTime::parse_from_str(&date_time_string, &date_time_format) {
+    let date = match NaiveDateTime::parse_from_str(&date_time_string, &date_time_format) {
         Ok(date) => Ok(date),
         Err(e) => Err(anyhow!(
             "Unable to parse date string [{}] using date format string [{}]; error: {}",
