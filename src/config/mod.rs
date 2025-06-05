@@ -348,6 +348,8 @@ pub struct FormatConfigFile {
     pub memo_config: Option<MemoConfig>,
     #[serde(rename = "categoryConfig")]
     pub category_config: Option<CategoryConfig>,
+    #[serde(rename = "accountConfig")]
+    pub account_config: Option<AccountConfig>,
 }
 
 impl FormatConfigFile {
@@ -578,6 +580,12 @@ pub struct MemoConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct CategoryConfig {
+    #[serde(rename = "fieldName")]
+    pub field_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AccountConfig {
     #[serde(rename = "fieldName")]
     pub field_name: String,
 }

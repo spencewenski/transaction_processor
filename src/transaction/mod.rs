@@ -43,38 +43,6 @@ enum TransactionStatus {
 }
 
 impl Transaction {
-    // fn build(
-    //     date: String,
-    //     date_format: String,
-    //     payee: String,
-    //     category: Option<String>,
-    //     transaction_type: TransactionType,
-    //     amount: Currency,
-    //     status: TransactionStatus,
-    //     memo: Option<String>,
-    // ) -> anyhow::Result<Transaction> {
-    //     let date = match DateTime::parse_from_str(&date, &date_format) {
-    //         Ok(date) => Ok(date),
-    //         Err(e) => Err(anyhow!(
-    //             "Unable to parse date string [{}] using date format string [{}]; error: {}",
-    //             date,
-    //             date_format,
-    //             e
-    //         )),
-    //     }?;
-    //     Ok(Transaction {
-    //         date,
-    //         raw_payee_name: InputCleaner::clean(payee),
-    //         normalized_payee_id: Option::None,
-    //         normalized_payee_name: Option::None,
-    //         category: InputCleaner::clean(category),
-    //         transaction_type,
-    //         amount: get_currency_absolute_value(amount),
-    //         status,
-    //         memo: InputCleaner::clean(memo),
-    //     })
-    // }
-
     pub fn normalize_payee(&mut self, config: &Config) {
         self.normalized_payee_id =
             PayeeNormalizer::normalized_payee_id(config, &self.raw_payee_name);

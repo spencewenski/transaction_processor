@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{AccountConfigFile, Config};
 use crate::config::{AmountFormat, FormatConfigFile};
 use crate::parser::{create_csv_writer, parse_csv_from_reader};
 use crate::transaction::{Transaction, TransactionStatus, TransactionType};
@@ -254,6 +254,7 @@ fn get_category(unmapped: &HashMap<String, String>, f: &FormatConfigFile) -> Opt
 pub fn export_to_configurable_format(
     w: Box<dyn io::Write>,
     c: &Config,
+    a: &AccountConfigFile,
     f: &FormatConfigFile,
     transactions: Vec<Transaction>,
 ) -> anyhow::Result<()> {
@@ -262,7 +263,7 @@ pub fn export_to_configurable_format(
         write_record(&mut w, &f.field_order)?;
     }
     for t in &transactions {
-        write_record(&mut w, &convert_to_configurable_format(f, t))?;
+        write_record(&mut w, &convert_to_configurable_format(a, f, t))?;
     }
     Ok(())
 }
@@ -277,7 +278,11 @@ fn write_record(w: &mut Writer<Box<dyn io::Write>>, r: &[String]) -> anyhow::Res
     Ok(())
 }
 
-fn convert_to_configurable_format(f: &FormatConfigFile, t: &Transaction) -> Vec<String> {
+fn convert_to_configurable_format(
+    a: &AccountConfigFile,
+    f: &FormatConfigFile,
+    t: &Transaction,
+) -> Vec<String> {
     let mut fields = HashMap::new();
 
     // Date
@@ -332,6 +337,10 @@ fn convert_to_configurable_format(f: &FormatConfigFile, t: &Transaction) -> Vec<
             c.field_name.to_owned(),
             t.memo.as_ref().unwrap_or(&Default::default()).to_owned(),
         );
+    }
+
+    if let Some(config) = f.account_config.as_ref() {
+        fields.insert(config.field_name.to_owned(), a.name.to_owned());
     }
 
     // Put the fields in the correct order

@@ -45,7 +45,13 @@ impl TransactionIO {
             }
             Option::None => Box::new(io::stdout()),
         };
-        formats::export_to_configurable_format(w, config, config.dst_format(), transactions)?;
+        formats::export_to_configurable_format(
+            w,
+            config,
+            config.account(),
+            config.dst_format(),
+            transactions,
+        )?;
         Ok(())
     }
 }
